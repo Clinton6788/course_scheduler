@@ -58,7 +58,10 @@ class Course:
         self.cost = round(gross * p, 2)
 
     def __eq__(self, other):
-        return self.course_id == other.course_id
+        if isinstance(other, Course):
+            return self.course_id == other.course_id
+        else:
+            return self.course_id == other
 
     def __lt__(self, other):
         return self.priority < other.priority

@@ -13,8 +13,8 @@ class Session:
     def __init__(self, session_num: int):
         # Define for easy location
         self._num = session_num
-        self._level = None
-        self._courses = None
+        self.level = None
+        self._courses = []
         self._intent = [] # 'Free' classes intend to be completed outside college
 
         self._start_date = None
@@ -63,7 +63,7 @@ class Session:
         self._tot_cost = COST_PER_SESSION
         for c in self._courses:
             # Validate level
-            assert self._level == c.level, f"Session||Level Difference||{self._level=}||{c.level=}"
+            assert self.level == c.level, f"Session||Level Difference||{self.level=}||{c.level=}"
             self._tot_courses += 1
             self._tot_ch += c.credit_hours
             self._pre_reqs.append(c.pre_reqs)
@@ -98,11 +98,6 @@ class Session:
     def num(self):
         """Session Number"""
         return self._num
-
-    @property
-    def level(self):
-        """Session Level (LevelENUM)"""
-        return self._level
 
     @property
     def courses(self):

@@ -20,7 +20,6 @@ class RestraintsENUM(IntEnum):
     FIRST_SES_INPERSON = 0 
     SES_COST_COVERED = 1    
     SES_MAX_CLASS = 2       
-    GIBILL_SETS_LAST = 3    
 
 class SessErrENUM(IntEnum):
     NOT_INPERSON = 0

@@ -86,16 +86,6 @@ class Scheduler:
         """Assigns Courses by priority and restraints.
         """
         print("Assigning Free Courses...")
-        # Get copies for working
-        sess_copy = self.sessions.copy()
-        scheduled_copy = self.scheduled.copy()
-        avail_sess_copy = self.avail_ses.copy()
-
-        copies = {
-            'sessions':sess_copy,
-            'scheduled':scheduled_copy,
-            'avail_sess':avail_sess_copy.sort()
-        }
 
         for t in working_courses:
             level, filtered_dict = t
@@ -105,7 +95,23 @@ class Scheduler:
             intent = filtered_dict.get(FilterENUM.INTENT, [])
             capstone = filtered_dict.get(FilterENUM.CAPSTONE, [])
 
-            # Conside intended classes as completed for prereq
+            # Check for quick cut:
+            if not free and not intent and not capstone:
+                return
+            
+            # Get copies for working
+            sess_copy = self.sessions.copy()
+            scheduled_copy = self.scheduled.copy()
+            avail_sess_copy = self.avail_ses.copy()
+            avail_sess_copy.sort()
+
+            copies = {
+                'sessions':sess_copy,
+                'scheduled':scheduled_copy,
+                'avail_sess':avail_sess_copy
+            }
+
+            # Consider intended classes as completed for prereq
             self.scheduled.extend(intent)
 
             # Consolidate into single, sorted list
@@ -114,41 +120,120 @@ class Scheduler:
             courses.extend(capstone) # Priority already adjusted
             courses.sort(key= lambda c: c.priority)
 
-            ses = self._schedule_sessions(courses, level, restraints, inperson, copies)
+            self._schedule_sessions(courses, level, restraints, inperson, copies)
 
 
     def _schedule_sessions(self, courses:list[Course], level:int, restraints:dict, inperson:list, sch:dict):
         """Attempts to schedule all sessions; """
-        print(f"Schduling Sessions...")
-        sessions = sch.get('sessions', {})
-        scheduled = sch.get('scheduled', [])
-        avail_sess = sch.get('avail_sess', [])
-        avail_sess.sort()
+        # Flatten Schedule Copies
+        sessions = sch.get('sessions')
+        scheduled = sch.get('scheduled')
+        avail_sess = sch.get('avail_sess')
+        
+        # Handle in person
+        sat = []
+        if isinstance(inperson, list) and inperson != []:
+            inperson_courses = [c for c in courses if c.course_id in inperson]
+            # If unsatisfied prereq, skip course
+            for c in inperson_courses:
+                unsat = self.unsatisfied_prereqs(c, scheduled)
+                if unsat == []:
+                    sat.append(c)
+            
+        # Verify Restraint:
+        if restraints.get(RestraintsENUM.FIRST_SES_INPERSON) and sat == []:
+            raise RuntimeError(f"Unable to satisfy In Person Requirement!")
+        
 
-        new_sess = self._schedule_session()
+        # Re sort List
+        courses.sort(key=lambda c: c.priority)
 
+        # Iter through and create sessions
+        max_course = restraints.get(RestraintsENUM.SES_MAX_CLASS)
+        while len(courses) > 0:
+            # Remove active session for working
+            print(avail_sess)
+            mt_ses = avail_sess.pop(0)
+            ses = self._create_session(mt_ses, sat, courses, scheduled, max_course)
+            # Confirm restraints
+            if not self._is_valid_session(ses, restraints):
+                raise RuntimeError(f"Invalid Session||{ses}")
+            
+            # Move assigned courses
+            for c in ses.courses:
+                courses.remove(c)
+                scheduled.append(c)
 
+            # Update sessions
+            sessions[ses.num] = ses
 
-    # def _schedule_session(self, courses, level, restraints, inperson, scheduled, sess_num):
+        # Session creation complete; commit and return
+        self.sessions = sessions
+        self.scheduled = scheduled
+        self.avail_ses = avail_sess
+                
+            
 
-    #     # Get first in person if present:
-    #     if inperson != []:
-    #         inperson_courses = [c for c in courses if c in inperson]
-    #         inperson_courses.sort(reverse=True, key= lambda c: c.priority)
-    #         c = 
+    def _create_session( # Done
+            self, 
+            ses:Session, 
+            inperson_sat:list[Course], 
+            courses:list[Course], 
+            scheduled:list[Course],
+            max_course:int)->Session: 
+        
+        inperson = False
+        ic = 0 # Courses iterations
+        ip = 0 # Inperson iterations
+        t = len(inperson_sat) + len(courses) # Total allowed
+        i = 0 # Total iterations
+        while len(ses.courses) < max_course:
+            # Fail early
+            if i > t:
+                raise RuntimeError(f"Failed to schedule session||{ses}||{courses=}")
+            
+            # Prioritize inperson, but only one per
+            if not inperson and ip < len(inperson_sat):
+                p = True
+                c = inperson[ip]
 
-    #     c = courses[0]
-    #     if not c.
+            else:
+                p = False
+                if not p and ic >= len(courses):
+                    RuntimeError(f"Failed to schedule session||{ses}||{courses=}")
+                c = courses[ic]
+
+            # Attempt to slot course:
+            if self.unsatisfied_prereqs(c, scheduled) == []:
+                # Prereqs satisfied, schedule and resest iters
+                ses.add_course(c)
+                ic = 0
+                ip = 0
+                i = 0
+            
+            # Failed to slot: 
+            # TODO: Update handling to get prereqs? 
+            # should be nullified by the sort unless inperson
+            else:
+                if p:
+                    ip += 1
+                else:
+                    ic += 1
+                i += 1
+
+        return ses
 
         
-    def _is_valid_session(self, session:Session, restraints: dict)->tuple:
+    def _is_valid_session(self, session:Session, restraints: dict)->bool:
         """Check and enforce restraints. 
         Args:
             session (Session): 
             restraints (dict): Restraints to be enforced. Keys must be RestraintsENUM.
         Returns:
-            tuple: (bool, Session|None, int|None) -> (is_valid, session with error, error type)
+            bool
         """
+        return True
+
 
     def _is_valid_schedule(self, sessions: list[Session], restraints: dict)->tuple:
         """Check and enforce restraints. 
@@ -198,7 +283,9 @@ class Scheduler:
                 # Handle Set Session
                 ses = self.sessions.get(c.session, None)
                 if ses is None: # Create new Session
-                    ses = Session(c.session, level, [c])
+                    ses = Session(c.session)
+                    ses.level = level
+                    ses.add_course(c)
                     self.sessions[c.session] = ses
                 else:
                     if ses.level is not level:
