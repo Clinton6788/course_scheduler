@@ -1,9 +1,8 @@
-from course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM
+from course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM, RestraintsENUM
 from src.sessions import Session
 import datetime as dt
 from settings import (
     SESSIONS,
-    MAX_COURSE_PER_SESSION,
     GRANT_OPP,
     GRANT_PELL,
     GI_BILL,
@@ -18,6 +17,7 @@ from settings import (
     )
 import pandas as pd
 from src.courses import Course
+from src.finances import FinanceMGR
 
 class Scheduler:
     def __init__(self):
@@ -25,12 +25,13 @@ class Scheduler:
         self.scheduled = []
         self.avail_ses = [] # Session Number Only
         self.ses_funds = 0 # Ideal max cost of session; is not absoloute
+        self.finmgr = FinanceMGR # Do not init yet
 
     def schedule_courses(
             self, 
             courses:dict, 
-            in_person: list = [], 
-            must_have_inperson: bool = False,
+            restraints: dict,
+            inperson: list = [], 
             ):
         """
         Main point of entry for scheduling courses. Schedules courses based on the provided level and options.
@@ -38,8 +39,8 @@ class Scheduler:
         Args:
             courses (dict): Dictionary of courses categorized by type or filter. 
                             Example: {LevelEnum: {FilterENUM: [Courses,...]}}
-            in_person (list, optional): List of course IDs to prioritize or enforce (based on 'must_have_in_person).
-            must_have_inperson (bool, optional): If True, fails if unable to schedule in-person on first avail session. Default False.
+            restraints (dict): Dictionary of restraints for scheduling. Keys in RestraintsENUM.
+            inperson (list, optional): List of course IDs to prioritize or enforce (based on 'must_have_inperson).
         
         Returns:
             dict: Scheduled courses with course IDs as keys and scheduled details as values.
@@ -54,6 +55,11 @@ class Scheduler:
         self._verify_course_dict(courses)
         print("Verification Passed")
 
+        # Prep avail sessions
+        for k,v in SESSIONS.items():
+            if v >= dt.date.today():
+                self.avail_ses.append(k)
+
         # Get easily workable structures
         working_courses = []
         for lev, filtered_dict in courses.items():
@@ -62,21 +68,70 @@ class Scheduler:
         # Assign completed or in progress
         self._assign_fixed(working_courses)
 
+        # Init and pre-load finmgr with historical sessions NOT ALL SET
+        today = dt.date.today()
+        sess_list = []
+        for ses in self.sessions.values():
+            if ses.start_date <= today:
+                sess_list.append(ses)
+
+        self.finmgr(sess_list)
+
+
         # Assign Remainder
-        self._assign_free(working_courses, in_person, must_have_inperson)
+        self._assign_free(working_courses, restraints, inperson)
 
 
-    def _assign_free(self, working_courses, in_person, must_have_inperson):
-        """Recurses and assigns Courses by priority and in-person restraints.
+    def _assign_free(self, working_courses, restraints, inperson):
+        """Assigns Courses by priority and restraints.
         """
         print("Assigning Free Courses...")
-        # Get copys for working
-        working_copies = []
-        for t in working_courses:
-            level, filtered_courses = t
-            working_copies.append((level, self._get_copies(filtered_courses)))
-        print(working_copies)
+        # Get copies for working
+        sess_copy = self.sessions.copy()
+        scheduled_copy = self.scheduled.copy()
+        avail_sess_copy = self.avail_ses.copy()
 
+        working_copies = []
+        for level, filtered_courses in working_courses:
+            working_copies.append((level, self._get_copies(filtered_courses)))
+
+        copies = {
+            'sessions': sess_copy,
+            'scheduled': scheduled_copy,
+            'avail_sessions': avail_sess_copy,
+            'working_courses': working_copies
+        }
+
+        # Attempt to schedule sessions
+        # MAY be incomplete; verify or handle with ignorance
+        tentative = self._schedule_sessions(copies, restraints, inperson)
+
+    def _schedule_sessions(self, copies, restraints, inperson, recur = 0):
+        """Attempts to schedule all sessions; """
+        print(f"Schduling attempt {recur}")
+        if recur >= MAX_RECURSION:
+            return copies
+        
+        # we make copies of copies and 
+        # try to schedule single session at a time
+
+
+
+        # on success, local commit, recurse
+
+        # on failure, recurse
+
+        pass
+        
+
+
+    def _is_valid_schedule(self, sessions: dict, restraints: dict)->bool:
+        """Check and enforce restraints. 
+        Args:
+            sessions (dict): Full, tentative dict of changes to enforce restraints on.
+            restraints (dict): Restraints to be enforced. Keys must be RestraintsENUM.
+        """
+        for k, ses in sessions:
 
 
     def _get_copies(self, courses:dict)->dict: # Done
@@ -92,8 +147,6 @@ class Scheduler:
             copy_dict[k] = v.copy()
 
         return copy_dict
-
-
 
     def _assign_fixed(self, working_courses)->None: # Done
         """Assigns completed, fixed and in-progress courses to self.scheduled;
@@ -127,11 +180,7 @@ class Scheduler:
                 self.scheduled.append(c)
         print("Fixed Courses Scheduled")
 
-
-
-
-
-    def _verify_course_dict(self, courses):
+    def _verify_course_dict(self, courses): # Done
         # Basic verification; brute force
         msg = f"Scheduler||Improper Courses||{courses}"
         assert isinstance(courses, dict), msg
@@ -146,90 +195,6 @@ class Scheduler:
                 for c in v:
                     assert isinstance(c, Course), msg
 
-    def _schedule_free(self, courses:dict, level, recur = 0):
-        """Courses: {CourseFilterENUM: [Course,Course...],...}"""
-        # Get approx CH cost
-        ch_cost = self._get_ch_cost(level)
-
-        # Init Temps, Copies
-        free, capstone, intent, scheduled, ses_dict = self._get_copies(courses)
-        scheduled.extend(intent)
-        temp_courses = {
-            'free':free,
-            'cap': capstone,
-            'intent':intent,
-            'scheduled':scheduled,
-            'sess_dict':ses_dict
-        }
-
-        count = 0
-        tot = len(temp_courses['free']) # Assumes 1 iter per course; more than enough
-        while count < tot:
-            print(f"Scheduling Session||{count}")
-            new = self._schedule_temp_session(temp_courses)
-            if new == False:
-                raise RecursionError(temp_courses) # HEAVY raise; try to diagnose;
-            temp_courses = new
-            count += 1
-
-
-    def _schedule_temp_session(
-            self, 
-            temp_courses: dict,
-            recur = 0):
-        
-        if recur >= MAX_RECURSION:
-            return False
-        
-        free = temp_courses['free'].copy()
-        cap = temp_courses['cap'].copy()
-        intent = temp_courses['intent'].copy()
-        scheduled = temp_courses['scheduled'].copy()
-        sess_dict = temp_courses['sess_dict'].copy()
-        
-        temp_ses_group = []
-        count = 0
-        while len(temp_ses_group)<MAX_COURSE_PER_SESSION and count < MAX_RECURSION:
-            count += 1
-            if len(free) == 0:
-                break
-            c = free[0]
-            # unsatisfied prereq
-            u = self.unsatisfied_prereqs(c, scheduled)
-            # Free for scheduling
-            if not u:
-                free.pop(0)
-                temp_ses_group.append(c)
-                continue
-            else:
-                # Unsatisfied Prereq
-                req_list = []
-                for pre in u:
-                    if isinstance(pre,list):
-                        key = next((k for k in pre if k in free),None)
-                        if key is None:
-                            raise RuntimeError(f"Unknown Requirement||{pre}||{c}")
-                        req_list.append(key)
-                    else:
-                        req_list.append(pre)
-                
-                # Bump PreReq Priority by 'x'
-                for p in req_list:
-                    x = (c.priority - p.priority) + recur
-                    p.priority += x
-
-                self._schedule_temp_session(temp_courses, recur+1)
-
-        if len(temp_ses_group) < MAX_COURSE_PER_SESSION and len(free)>=1:
-            # Recursion Error
-            raise RecursionError(f"Temp Session||{temp_courses}")
-        
-        return temp_ses_group
-        
-
-
-
-        
     def unsatisfied_prereqs(self, course, completed: list = None):
         """
         Returns a list of unsatisfied prerequisites:
@@ -255,12 +220,12 @@ class Scheduler:
     def _calc_ses_funds(self):
         self.ses_funds = round(
             GRANT_PELL + GRANT_OPP +
-            (GI_BILL/SESSIONS_PER_SEMESTER*SEMESTERS_PER_YEAR)
+            (GI_BILL/(SESSIONS_PER_SEMESTER*SEMESTERS_PER_YEAR))
             ,0
         )
 
     def _get_ch_cost(self, level)-> int:
-        """Assumes MAX course load."""
+        """Gets average credit hour cost. Assumes MAX course load."""
         if level == LevelENUM.UNDERGRAD:
             ch_rate = COST_PER_CH_UNDERGRAD
             m = 1

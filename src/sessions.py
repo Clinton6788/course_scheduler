@@ -1,7 +1,6 @@
 from settings import (
     SESSIONS,
     COST_PER_SESSION,
-    MAX_COURSE_PER_SESSION
 )
 from datetime import timedelta
 from course_enums import LevelENUM
@@ -24,12 +23,38 @@ class Session:
         self._tot_courses = 0
         self._tot_ch = 0
         self._tot_cost = 0
+        self.adj_cost = 0
 
         self._pre_reqs = []
 
         # Calc Values
         self._calc_dates()
         self._calc_courses()
+
+    # region Comp Dunders
+    def _get_comp_val(self, other):
+        if isinstance(other, Session):
+            return other._num
+        return int(other)
+
+    def __eq__(self, other):
+        return self._num == self._get_comp_val(other)
+
+    def __lt__(self, other):
+        return self._num < self._get_comp_val(other)
+
+    def __le__(self, other):
+        return self._num <= self._get_comp_val(other)
+
+    def __gt__(self, other):
+        return self._num > self._get_comp_val(other)
+
+    def __ge__(self, other):
+        return self._num >= self._get_comp_val(other)
+
+    def __ne__(self, other):
+        return self._num != self._get_comp_val(other)
+    # endregion
 
     def _calc_dates(self):
         self._start_date = SESSIONS.get(self.num)
@@ -44,7 +69,6 @@ class Session:
             self._tot_ch += c.credit_hours
             self._pre_reqs.append(c.pre_reqs)
             self._tot_cost += c.cost
-        assert self._tot_courses <= MAX_COURSE_PER_SESSION, f"Session {self._num}||Too Many Courses||{self._tot_courses=}"
 
     def add_course(self, course: Course):
         self._courses.append(course)

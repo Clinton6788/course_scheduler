@@ -14,3 +14,10 @@ class CourseFilterENUM(IntEnum):
     SET_SESSION = 1
     INTENT = 2
     CAPSTONE = 3
+
+class RestraintsENUM(IntEnum):
+    # Any changes must be reflected in src.scheduler > Scheduler._is_valid_schedule()
+    FIRST_SES_INPERSON = 0 
+    SES_COST_COVERED = 1    
+    SES_MAX_CLASS = 2       
+    GIBILL_SETS_LAST = 3    

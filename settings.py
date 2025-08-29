@@ -13,9 +13,6 @@ COST_PER_CH_UNDERGRAD = 514
 COST_PER_CH_GRAD = 776
 ALUMNI_SAVINGS_PERCENT = 20 # Whole percentage; Ex: '20' for 20%.... NOT 0.2.... **ONLY APPLIES TO GRAD LEVEL**
 
-"""---------Constraints----------"""
-MAX_COURSE_PER_SESSION = 4
-
 
 """----------Sessions Start Dates------------"""
 SESSIONS = {
