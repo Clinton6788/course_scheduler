@@ -25,3 +25,26 @@
 - Be able to move courses to adjust schedule
     - Auto adjusts costs, pre-reqs, remaining schedule, etc.
 - Download .csv with tentative schedule and course details
+
+## Flow
+### Intake/Org
+- `get_excel()`
+    - Data imported and cleand from CSV/EXCEL; converted to dataframe
+- `df` returned
+- `create_courses(df)`
+    - Course objects created from rows
+- `all_courses` LIST returned
+- `organize_courses(all_courses)`
+    - Seperates into 'Level' (grad, undergrad)
+    - Returned data structure `{LevelENUM.value: {Course.course_id: Course,...},...}`
+- `course_level_dict` returned
+- `for k,v in course_level_dict:`
+    - Iter through to get individual level dicts
+    - `prioritize_courses(v)`
+        - Assigns and orders by course priority
+        - `ordered_courses` LIST returned
+    - `filter_courses(ordered_courses)`
+        - filters based on CourseFilterEnum
+        - Returns: `{CourseFilterENUM.value: [Course,...],...}`
+    - `filtered_course_dict` returned
+    - `course_level_dict[k] = filtered_course_dict`

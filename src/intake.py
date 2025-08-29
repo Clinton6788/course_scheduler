@@ -151,27 +151,30 @@ def get_excel():
 
 # region Org
 
+import re
+
 def parse_prereqs(prereq_str: str) -> list:
     """
     Convert a prereq string like 'AND1|AND2|[OR1|OR2|OR3]|AND3'
     into a structured list:
     ['AND1', 'AND2', ['OR1','OR2','OR3'], 'AND3']
+    Brackets are removed from strings, OR groups are preserved as sublists.
     """
     if not prereq_str or str(prereq_str).lower() in {"none", "nan"}:
         return []
 
-    tokens = prereq_str.split('|')
     structured = []
-
-    for token in tokens:
-        token = token.strip()
+    # Match either bracketed groups or single tokens
+    pattern = re.compile(r'\[.*?\]|[^|]+')
+    for match in pattern.findall(prereq_str):
+        token = match.strip()
         if token.startswith('[') and token.endswith(']'):
+            # OR group: split inside brackets
             or_group = [pr.strip() for pr in token[1:-1].split('|')]
             structured.append(or_group)
         else:
             structured.append(token)
     return structured
-
 
 def create_courses(df: pd.DataFrame) -> list:
     print("Creating Courses")
@@ -265,7 +268,7 @@ def filter_courses(courses: list) -> dict:
     Maintains list order of 'courses' arg.
     """
     print("Filtering Courses...")
-    filtered_courses = {i: [] for i in FILT}
+    filtered_courses = {i.value: [] for i in FILT}
 
     for c in courses:
         if c.status == StatusENUM.COMPLETED or isinstance(c.session, int):
@@ -289,3 +292,50 @@ def filter_courses(courses: list) -> dict:
     return filtered_courses
 
 # endregion
+
+def get_courses_pipeline(in_person: list = []) -> dict:
+    """
+    Process raw course data through the full pipeline:  
+    1. Load from Excel  
+    2. Create Course objects  
+    3. Organize by level  
+    4. Prioritize courses  
+    5. Filter into categories (FilterENUM)  
+
+    Args:
+        in_person (list): Optional list of course IDs to treat as in-person for filtering logic.
+
+    Returns:
+        dict: Nested structure of courses by level and filter category:
+            {
+                LevelENUM: {
+                    FilterENUM: [Course, Course, ...],
+                    ...
+                },
+                ...
+            }
+    """
+    raw_df = get_excel()
+
+    # Flattened list of Course objects
+    all_classes_list = create_courses(raw_df)
+
+    # Organize courses by LevelENUM
+    org_by_level_dict = organize_courses(all_classes_list)
+    # -> {LevelENUM: {Course.course_id: Course obj, ...}, ...}
+
+    # Prioritize courses per level
+    prioritized_dict = {
+        k: prioritize_courses(v,in_person=in_person)
+        for k, v in org_by_level_dict.items()
+    }
+    # -> {LevelENUM: [Course, Course, ...], ...}
+
+    # Filter courses per level into FilterENUM categories
+    final_dict = {
+        k: filter_courses(v)
+        for k, v in prioritized_dict.items()
+    }
+    # -> {LevelENUM: {FilterENUM: [Courses], ...}, ...}
+
+    return final_dict
