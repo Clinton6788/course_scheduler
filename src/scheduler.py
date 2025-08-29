@@ -17,6 +17,7 @@ from settings import (
     MAX_RECURSION
     )
 import pandas as pd
+from src.courses import Course
 
 class Scheduler:
     def __init__(self):
@@ -28,34 +29,47 @@ class Scheduler:
     def schedule_courses(
             self, 
             courses:dict, 
-            level: int,
-            in_person: list, 
-            take_all_intent: bool = True
+            in_person: list = [], 
+            must_have_inperson: bool = False,
             ):
+        """
+        Main point of entry for scheduling courses. Schedules courses based on the provided level and options.
         
-        # Courses dict pre-sorted
-        # Assign all fixed first
-        if not level in LevelENUM:
-            raise ValueError(f"Schedule Courses||Improper Level:{level}")
+        Args:
+            courses (dict): Dictionary of courses categorized by type or filter. 
+                            Example: {LevelEnum: {FilterENUM: [Courses,...]}}
+            in_person (list, optional): List of course IDs to prioritize or enforce (based on 'must_have_in_person).
+            must_have_inperson (bool, optional): If True, fails if unable to schedule in-person on first avail session. Default False.
         
-        # Get 'avail' sessions for free courses
-        today = dt.datetime.today().date()
-        self.avail_ses = []
-        for k, v in SESSIONS.items():
-            if today < v:
-                self.avail_ses.append(k)
-        self.avail_ses.sort()
-
-        # Set 'max' cost (ideal rather than mandatory)
-        self._calc_ses_funds()
+        Returns:
+            dict: Scheduled courses with course IDs as keys and scheduled details as values.
         
-        # Schedule fixed
-        fixed = courses.get(CourseFilterENUM.SET_SESSION, [])
-        self._schedule_fixed(fixed, level)
+        Notes:
+            - This function handles prerequisite checks and in-person constraints.
+            - Must_have_inperson=True ensures in-person requirement is respected; fails if not able to schedule
+        """
+        # Verify Data
+        self._verify_course_dict(courses)
+        print("Verification Passed")
 
-        # Schedule Remaining
-        self._schedule_free(courses, level)
 
+
+
+
+    def _verify_course_dict(self, courses):
+        # Basic verification; brute force
+        msg = f"Scheduler||Improper Courses||{courses}"
+        assert isinstance(courses, dict), msg
+
+        normalized = {}
+        for lvl, subdict in courses.items():
+            assert isinstance(lvl, int), msg
+            assert isinstance(subdict, dict), msg
+            for k, v in subdict.items():
+                assert isinstance(k, int), msg
+                assert isinstance(v, list), msg
+                for c in v:
+                    assert isinstance(c, Course), msg
 
     def _schedule_free(self, courses:dict, level, recur = 0):
         """Courses: {CourseFilterENUM: [Course,Course...],...}"""
