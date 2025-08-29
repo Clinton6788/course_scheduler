@@ -1,4 +1,4 @@
-from course_enums import CourseFilterENUM, LevelENUM
+from course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM
 from src.sessions import Session
 import datetime as dt
 from settings import (
@@ -48,9 +48,84 @@ class Scheduler:
             - This function handles prerequisite checks and in-person constraints.
             - Must_have_inperson=True ensures in-person requirement is respected; fails if not able to schedule
         """
+        print("Scheduling...")
+
         # Verify Data
         self._verify_course_dict(courses)
         print("Verification Passed")
+
+        # Get easily workable structures
+        working_courses = []
+        for lev, filtered_dict in courses.items():
+            working_courses.append((lev, filtered_dict))
+
+        # Assign completed or in progress
+        self._assign_fixed(working_courses)
+
+        # Assign Remainder
+        self._assign_free(working_courses, in_person, must_have_inperson)
+
+
+    def _assign_free(self, working_courses, in_person, must_have_inperson):
+        """Recurses and assigns Courses by priority and in-person restraints.
+        """
+        print("Assigning Free Courses...")
+        # Get copys for working
+        working_copies = []
+        for t in working_courses:
+            level, filtered_courses = t
+            working_copies.append((level, self._get_copies(filtered_courses)))
+        print(working_copies)
+
+
+
+    def _get_copies(self, courses:dict)->dict: # Done
+        """Get copies of current structure for adjustments. Copies shallow;
+        any object modification affects all.
+        Args:
+            courses (dict): Flattened 'filtered courses' {FilterENUM: [Courses]}
+        Returns:
+            dict: Same format as passed; just copies of all
+        """
+        copy_dict = {}
+        for k, v in courses.items():
+            copy_dict[k] = v.copy()
+
+        return copy_dict
+
+
+
+    def _assign_fixed(self, working_courses)->None: # Done
+        """Assigns completed, fixed and in-progress courses to self.scheduled;
+        Adds session objects to self.sessions{}.
+        """
+        print("Scheduling Fixed Courses...")
+        for t in working_courses:
+            level, courses = t
+            fixed = courses.get(FilterENUM.SET_SESSION, None)
+
+            if fixed is None:
+                continue
+
+            for c in fixed:
+                # Handle transfers
+                if not c.session or pd.isna(c.session):
+                    if not c.status == StatusENUM.COMPLETED:
+                        raise RuntimeError(f"Assign Fixed||Improper Filtering||{c}")
+                    self.scheduled.append(c)
+                    continue
+
+                # Handle Set Session
+                ses = self.sessions.get(c.session, None)
+                if ses is None: # Create new Session
+                    ses = Session(c.session, level, [c])
+                    self.sessions[c.session] = ses
+                else:
+                    if ses.level is not level:
+                        raise RuntimeError(f"ERROR||Assign Fixed||{ses.level=}||{level=}")
+                    ses.add_course(c)
+                self.scheduled.append(c)
+        print("Fixed Courses Scheduled")
 
 
 
@@ -154,23 +229,6 @@ class Scheduler:
 
 
 
-    def _get_copies(self, courses)->tuple:
-        """Get copies of current structure for adjustments. Copies shallow;
-        do NOT modify internal objects.
-        Returns:
-            tuple: [free_list, capstone_list, intent_list, scheduled_list, session_dict]
-        """
-        t = courses[CourseFilterENUM.FREE]
-        free_copy = t.copy() # List of Courses
-        t = courses[CourseFilterENUM.CAPSTONE]
-        cap_copy = t.copy() # List of Courses
-        t = courses[CourseFilterENUM.INTENT]
-        int_copy = t.copy() # List of Courses
-
-        scheduled_copy = self.scheduled.copy() # List of Courses
-        temp_ses = self.sessions.copy() # Dict of {ses #: Session} Includes scheduled
-
-        return free_copy, cap_copy, int_copy, scheduled_copy, temp_ses
         
     def unsatisfied_prereqs(self, course, completed: list = None):
         """
@@ -193,21 +251,6 @@ class Scheduler:
 
         return unsatisfied
 
-    def _schedule_fixed(self, fixed: list, level: int):
-        print("Scheduling Fixed Courses...")
-        for c, i in enumerate(fixed):
-            ses = self.sessions.get(c.session, None)
-            if ses is None:
-                ses = Session(c.session, level, [c])
-                self.sessions[c.session] = ses
-            else:
-                if ses.level is not level:
-                    raise RuntimeError(f"ERROR||Schedule Fixed||{ses.level=}||{level=}")
-                ses.add_course(c)
-            self.scheduled.append(c)
-            fixed.pop(i)
-
-        print("Fixed Courses Scheduled")
 
     def _calc_ses_funds(self):
         self.ses_funds = round(
