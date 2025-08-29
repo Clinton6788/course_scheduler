@@ -31,3 +31,37 @@ Deleting copies; SHOULD be unnecessary
         return free_copy, cap_copy, int_copy, scheduled_copy, temp_ses
 
 ```
+
+```python
+    # Step 1: Base priority modifications (count prereqs, capstone bonus/penalty)
+    for c in courses.values():
+        items = []
+        count = 0
+        for req in c.pre_reqs:
+            if isinstance(req, list):
+                items.extend(req)
+            else:
+                items.append(req)
+            count += 1
+        p.extend(items)
+
+        c.priority -= count  # More prereqs = lower priority
+        if c.capstone:
+            c.priority -= 10  # Capstones lower priority baseline
+        final_list.append(c)
+
+    # Step 2: Add frequency-based influence
+    for i in p:
+        c = courses.get(i)
+        if c is not None:
+            c.priority += 1
+
+
+    for c in final_list:
+        c.priority += add_recursive_priority(c, courses)
+
+    # Step 4: Sort
+    final_list.sort(reverse=True, key=lambda c: c.priority)
+    print("Prioritizing Complete")
+
+```

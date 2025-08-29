@@ -23,9 +23,9 @@ class Scheduler:
     def __init__(self):
         self.sessions = {}
         self.scheduled = []
-        self.avail_ses = [] # Session Number Only
+        self.avail_ses = [] # Session Objects
         self.ses_funds = 0 # Ideal max cost of session; is not absoloute
-        self.finmgr = FinanceMGR # Do not init yet
+        self.finmgr = FinanceMGR # Do not init yet; init in schedule courses
 
     def schedule_courses(
             self, 
@@ -58,17 +58,17 @@ class Scheduler:
         # Prep avail sessions
         for k,v in SESSIONS.items():
             if v >= dt.date.today():
-                self.avail_ses.append(k)
+                self.avail_ses.append(Session(k))
 
         # Get easily workable structures
         working_courses = []
         for lev, filtered_dict in courses.items():
             working_courses.append((lev, filtered_dict))
 
-        # Assign completed or in progress
+        # Assign fixed to sessions (completed, inprogress, set)
         self._assign_fixed(working_courses)
 
-        # Init and pre-load finmgr with historical sessions NOT ALL SET
+        # Init and pre-load finmgr with historical sessions (started on/before today)
         today = dt.date.today()
         sess_list = []
         for ses in self.sessions.values():
@@ -82,7 +82,7 @@ class Scheduler:
         self._assign_free(working_courses, restraints, inperson)
 
 
-    def _assign_free(self, working_courses, restraints, inperson):
+    def _assign_free(self, working_courses: list[tuple], restraints, inperson):
         """Assigns Courses by priority and restraints.
         """
         print("Assigning Free Courses...")
@@ -91,47 +91,74 @@ class Scheduler:
         scheduled_copy = self.scheduled.copy()
         avail_sess_copy = self.avail_ses.copy()
 
-        working_copies = []
-        for level, filtered_courses in working_courses:
-            working_copies.append((level, self._get_copies(filtered_courses)))
-
         copies = {
-            'sessions': sess_copy,
-            'scheduled': scheduled_copy,
-            'avail_sessions': avail_sess_copy,
-            'working_courses': working_copies
+            'sessions':sess_copy,
+            'scheduled':scheduled_copy,
+            'avail_sess':avail_sess_copy.sort()
         }
 
-        # Attempt to schedule sessions
-        # MAY be incomplete; verify or handle with ignorance
-        tentative = self._schedule_sessions(copies, restraints, inperson)
+        for t in working_courses:
+            level, filtered_dict = t
 
-    def _schedule_sessions(self, copies, restraints, inperson, recur = 0):
+            # Get base level course lists
+            free = filtered_dict.get(FilterENUM.FREE, [])
+            intent = filtered_dict.get(FilterENUM.INTENT, [])
+            capstone = filtered_dict.get(FilterENUM.CAPSTONE, [])
+
+            # Conside intended classes as completed for prereq
+            self.scheduled.extend(intent)
+
+            # Consolidate into single, sorted list
+            courses = []
+            courses.extend(free)
+            courses.extend(capstone) # Priority already adjusted
+            courses.sort(key= lambda c: c.priority)
+
+            ses = self._schedule_sessions(courses, level, restraints, inperson, copies)
+
+
+    def _schedule_sessions(self, courses:list[Course], level:int, restraints:dict, inperson:list, sch:dict):
         """Attempts to schedule all sessions; """
-        print(f"Schduling attempt {recur}")
-        if recur >= MAX_RECURSION:
-            return copies
+        print(f"Schduling Sessions...")
+        sessions = sch.get('sessions', {})
+        scheduled = sch.get('scheduled', [])
+        avail_sess = sch.get('avail_sess', [])
+        avail_sess.sort()
+
+        new_sess = self._schedule_session()
+
+
+
+    # def _schedule_session(self, courses, level, restraints, inperson, scheduled, sess_num):
+
+    #     # Get first in person if present:
+    #     if inperson != []:
+    #         inperson_courses = [c for c in courses if c in inperson]
+    #         inperson_courses.sort(reverse=True, key= lambda c: c.priority)
+    #         c = 
+
+    #     c = courses[0]
+    #     if not c.
+
         
-        # we make copies of copies and 
-        # try to schedule single session at a time
-
-
-
-        # on success, local commit, recurse
-
-        # on failure, recurse
-
-        pass
-        
-
-
-    def _is_valid_schedule(self, sessions: dict, restraints: dict)->bool:
+    def _is_valid_session(self, session:Session, restraints: dict)->tuple:
         """Check and enforce restraints. 
         Args:
-            sessions (dict): Full, tentative dict of changes to enforce restraints on.
+            session (Session): 
             restraints (dict): Restraints to be enforced. Keys must be RestraintsENUM.
+        Returns:
+            tuple: (bool, Session|None, int|None) -> (is_valid, session with error, error type)
         """
-        for k, ses in sessions:
+
+    def _is_valid_schedule(self, sessions: list[Session], restraints: dict)->tuple:
+        """Check and enforce restraints. 
+        Args:
+            sessions (list): Full, tentative list of sessions to confirm
+            restraints (dict): Restraints to be enforced. Keys must be RestraintsENUM.
+        Returns:
+            tuple: (bool, Session|None, str|None) -> (is_valid, session with error, error type)
+        """
+        pass
 
 
     def _get_copies(self, courses:dict)->dict: # Done

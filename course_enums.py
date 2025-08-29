@@ -21,3 +21,10 @@ class RestraintsENUM(IntEnum):
     SES_COST_COVERED = 1    
     SES_MAX_CLASS = 2       
     GIBILL_SETS_LAST = 3    
+
+class SessErrENUM(IntEnum):
+    NOT_INPERSON = 0
+    COST_NOT_COVERED = 1
+    OVER_MAX_CLASS = 2
+    OUT_OF_BENEFITS = 3
+    PREREQ_NOT_MET = 4

@@ -4,7 +4,7 @@ from datetime import date
 IN_PERSON_PRIORITY = 20 # Base amount to raise priority of in person classes
 SESSIONS_PER_SEMESTER = 2
 SEMESTERS_PER_YEAR = 3
-MAX_RECURSION = 20
+MAX_RECURSION = 50
 
 """---------Current Course Costs----------"""
 COST_PER_SESSION = 40

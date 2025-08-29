@@ -222,9 +222,10 @@ def organize_courses(courses:list)->dict:
     
     raise ValueError(f"Courses Wrong Level||{err}")
 
-def prioritize_courses(courses:dict, in_person: list = [])->list:
-    """Prioritizes courses based on dependencies count and in_person list.
-    Unaware; caution.
+def prioritize_courses(courses: dict, in_person: list = []) -> list:
+    """
+    Prioritizes courses based on dependency count and in_person list.
+    
     Args:
         courses (dict): MUST be flattened: {course_id: course_obj,}
         in_person (list): List of course IDs to be prioritized.
@@ -233,35 +234,69 @@ def prioritize_courses(courses:dict, in_person: list = [])->list:
         list: List of priority sorted Course objects [Highest...Lowest]
     """
     print("Prioritizing Courses...")
-    # Get and flatten all prereqs
-    p = []
-    final_list = []
+    # Zero out priorities
     for c in courses.values():
-        items = []
-        count = 0
-        for req in c.pre_reqs:
-            if isinstance(req,list):
-                for i in req:
-                    items.append(i)
-            else:
-                items.append(req)
-            count += 1
-        p.extend(items)
-        # Get number of courses c is dependent on
-        c.priority -= count
-        final_list.append(c)
+        c.priority = 0
 
-    # Add prereq counts to priority
-    for i in p:
-        c = courses.get(i)
-        if c is not None:
-            c.priority += 1
+    return topo_sort_with_priority(courses) 
 
-    # Sort by 'priority' in Course
-    final_list.sort(reverse=True, key=lambda c: c.priority)
-    print("Prioritizing Complete")
 
-    return final_list
+from collections import defaultdict, deque
+
+def extract_flat_prereqs(prereqs):
+    """Flatten AND/OR prereqs into a flat list of course_ids."""
+    flat = []
+    for p in prereqs:
+        if isinstance(p, list):
+            flat.extend(p)
+        else:
+            flat.append(p)
+    return flat
+
+def topo_sort_with_priority(courses: dict) -> list:
+    """
+    Topologically sort courses based on prereqs.
+    Assign priority = depth. Ensures all prereqs appear before dependents.
+    """
+    from collections import defaultdict
+
+    graph = defaultdict(list)
+    visited = {}
+    sorted_courses = []
+
+    # Build graph: prereq -> dependent
+    for cid, course in courses.items():
+        flat_reqs = extract_flat_prereqs(course.pre_reqs)
+        for pre in flat_reqs:
+            graph[pre].append(cid)
+
+    def dfs(course_id, depth=0):
+        if course_id not in courses:
+            return  # Prereq not in catalog
+        if visited.get(course_id) == "temp":
+            raise Exception(f"Cyclic dependency detected at {course_id}")
+        if visited.get(course_id) == "perm":
+            return
+
+        visited[course_id] = "temp"
+        max_depth = 0
+        for dependent in graph[course_id]:
+            dfs(dependent, depth + 1)
+            max_depth = max(max_depth, courses[dependent].priority + 1)
+
+        # Set depth as priority
+        courses[course_id].priority = max(courses[course_id].priority, max_depth)
+        visited[course_id] = "perm"
+        sorted_courses.append(course_id)
+
+    # Start DFS from all known courses
+    for cid in courses:
+        if visited.get(cid) is None:
+            dfs(cid)
+
+    # Return sorted Course objects by priority descending
+    return sorted(courses.values(), key=lambda c: c.priority, reverse=True)
+
 
 def filter_courses(courses: list) -> dict:
     """Filters courses into dict with CourseFilterENUM key and list of courses.

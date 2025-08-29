@@ -10,11 +10,11 @@ from src.courses import Course
 
 class Session:
     """Represents one session. Outside of init, all changes must be made through Session.modify()."""
-    def __init__(self, session_num: int, level: int, courses: list):
+    def __init__(self, session_num: int):
         # Define for easy location
         self._num = session_num
-        self._level = level
-        self._courses = courses
+        self._level = None
+        self._courses = None
         self._intent = [] # 'Free' classes intend to be completed outside college
 
         self._start_date = None
@@ -29,7 +29,6 @@ class Session:
 
         # Calc Values
         self._calc_dates()
-        self._calc_courses()
 
     # region Comp Dunders
     def _get_comp_val(self, other):

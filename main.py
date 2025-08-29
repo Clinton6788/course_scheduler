@@ -16,8 +16,9 @@ IN_PERSON = []
 
 def run_main():
     course_dict = get_courses_pipeline(IN_PERSON)
-    s = Scheduler()
-    s.schedule_courses(courses=course_dict, restraints=RESTRAINTS, inperson=IN_PERSON)
+    print(course_dict)
+    # s = Scheduler()
+    # s.schedule_courses(courses=course_dict, restraints=RESTRAINTS, inperson=IN_PERSON)
 
 if __name__ == '__main__':
     run_main()
