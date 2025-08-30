@@ -1,3 +1,4 @@
-from .courses import Course
-from .sessions import Session
+from .scheduler import Scheduler
+
+
 

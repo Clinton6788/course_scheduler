@@ -1,7 +1,7 @@
-from course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM, RestraintsENUM
+from src.course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM, RestraintsENUM
 from src.sessions import Session
 import datetime as dt
-from settings import (
+from config.settings import (
     SESSIONS,
     GRANT_OPP,
     GRANT_PELL,
@@ -99,6 +99,9 @@ class Scheduler:
             if not free and not intent and not capstone:
                 return
             
+            # Consider intended classes as completed for prereq
+            self.scheduled.extend(intent)
+            
             # Get copies for working
             sess_copy = self.sessions.copy()
             scheduled_copy = self.scheduled.copy()
@@ -111,8 +114,6 @@ class Scheduler:
                 'avail_sess':avail_sess_copy
             }
 
-            # Consider intended classes as completed for prereq
-            self.scheduled.extend(intent)
 
             # Consolidate into single, sorted list
             courses = []
@@ -206,7 +207,7 @@ class Scheduler:
             else:
                 p = False
                 if not p and ic >= len(courses):
-                    RuntimeError(f"Failed to schedule session||{ses}||{courses=}")
+                    raise RuntimeError(f"Failed to schedule session||{ses}||{courses=}")
                 c = courses[ic]
 
             # Attempt to slot course:

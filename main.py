@@ -1,7 +1,13 @@
 from src.intake import get_courses_pipeline
 from src.scheduler import Scheduler
-from course_enums import RestraintsENUM as R
+from src.course_enums import RestraintsENUM as R
 
+
+
+
+
+FILE_PATH = "/mnt/c/Users/clint/OneDrive/Documents/Education/DeVry/A-Scheduling/import_for_py.xlsx"
+ABSOLOUTE_PATH = True
 
 RESTRAINTS = {
     R.FIRST_SES_INPERSON: False,    # Bool, Does first session need to be in person
@@ -9,40 +15,36 @@ RESTRAINTS = {
     R.SES_MAX_CLASS: 4,             # Int, Max number of classes per session
 }
 
-# Optional IF 'R.FIRST_SES_INPERSON' = False, else mandatory
+"""IN_PERSON:
+Optional IF 'R.FIRST_SES_INPERSON' = False, else mandatory
+Can be:
+    List, 
+    Str("path/to/inperson/excel"),
+    None
+"""
 IN_PERSON = [] 
 
 
-import pickle
-from pathlib import Path
-from src.intake import get_courses_pipeline
-
-def store_data():
-    course_dict = get_courses_pipeline([])
-
-    file_path = Path.cwd() / "course_dict.pkl"
-    with open(file_path, "wb") as f:
-        pickle.dump(course_dict, f)
-
-def load_data():
-    file_path = Path.cwd() / "course_dict.pkl"
-
-    # To load back:
-    with open(file_path, "rb") as f:
-        loaded_courses = pickle.load(f)
-    return loaded_courses
 
 
 
-def run_main():
-    course_dict = load_data()
-    # course_dict = get_courses_pipeline(IN_PERSON)
+def get_schedule():
 
-    print(course_dict)
+    course_dict = get_courses_pipeline(FILE_PATH, ABSOLOUTE_PATH, IN_PERSON)
+
     s = Scheduler()
     s.schedule_courses(courses=course_dict, restraints=RESTRAINTS, inperson=IN_PERSON)
     for _, ses in s.sessions.items():
         print(f"Session {ses}")
 
+
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
-    run_main()
+    get_schedule()

@@ -1,4 +1,4 @@
-from settings import (
+from config.settings import (
     GRANT_OPP,
     GRANT_PELL,
     GI_BILL,

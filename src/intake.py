@@ -1,7 +1,7 @@
 import pandas as pd
 from src.courses import Course
-from course_enums import StatusENUM, LevelENUM, CourseFilterENUM as FILT
-from settings import (
+from src.course_enums import StatusENUM, LevelENUM, CourseFilterENUM as FILT
+from config.settings import (
     SESSIONS, 
     IN_PERSON_PRIORITY,
 )
@@ -126,13 +126,25 @@ def replace_bool(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+from pathlib import Path
+def get_excel(file_path: str, is_absolute: bool = True):
+    print("Fetching Excel or CSV")
 
-def get_excel():
-    print("Fetching Excel")
-    file_path = "/mnt/c/Users/clint/OneDrive/Documents/Education/DeVry/A-Scheduling/import_for_py.xlsx"
+    # Resolve path
+    path = Path(file_path)
+    if not is_absolute:
+        path = Path.cwd() / path  # Treat as relative to current working dir
 
-    # Load Excel file
-    df = pd.read_excel(file_path)
+    # Determine file type
+    ext = path.suffix.lower()
+
+    # Load data accordingly
+    if ext in [".xlsx", ".xls"]:
+        df = pd.read_excel(path)
+    elif ext == ".csv":
+        df = pd.read_csv(path)
+    else:
+        raise ValueError(f"Unsupported file extension: {ext}")
 
     # Normalize columns 
     df = normalize_columns(df)
@@ -146,7 +158,6 @@ def get_excel():
 
     print("Fetch/Validation Complete")
     return df
-
 # endregion
 
 # region Org
@@ -328,7 +339,12 @@ def filter_courses(courses: list) -> dict:
 
 # endregion
 
-def get_courses_pipeline(in_person: list = []) -> dict:
+def get_courses_pipeline(
+        course_path: str,
+        course_path_abs: bool,
+        in_person: list|None|str,
+
+        ) -> dict:
     """
     Process raw course data through the full pipeline:  
     1. Load from Excel  
@@ -350,7 +366,20 @@ def get_courses_pipeline(in_person: list = []) -> dict:
                 ...
             }
     """
-    raw_df = get_excel()
+    # Quick Validation:
+    msg = "Get Courses Pipeline||Improper Arg: "
+    assert isinstance(course_path, str), f"{msg} course_path: {type(course_path)}"
+    assert isinstance(course_path_abs, bool), f"{msg} course_path_abs: {type(course_path_abs)}"
+    if in_person == None:
+        in_person = []
+    elif isinstance(in_person, str):
+        raise NotImplementedError(f"{msg} STR path for in_person not supported yet")
+    elif isinstance(in_person, list):
+        assert (all(isinstance(x, str) for x in in_person) or in_person == []), f"{msg} in_person contents: {in_person}"
+    else:
+        raise TypeError(f"{msg} in_person: {type(in_person)}")
+
+    raw_df = get_excel(course_path, is_absolute=course_path_abs)
 
     # Flattened list of Course objects
     all_classes_list = create_courses(raw_df)
@@ -360,6 +389,7 @@ def get_courses_pipeline(in_person: list = []) -> dict:
     # -> {LevelENUM: {Course.course_id: Course obj, ...}, ...}
 
     # Prioritize courses per level
+    
     prioritized_dict = {
         k: prioritize_courses(v,in_person=in_person)
         for k, v in org_by_level_dict.items()

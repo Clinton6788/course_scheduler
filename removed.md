@@ -65,3 +65,25 @@ Deleting copies; SHOULD be unnecessary
     print("Prioritizing Complete")
 
 ```
+
+```python
+import pickle
+from pathlib import Path
+from src.intake import get_courses_pipeline
+
+"""For laptop/no excel use"""
+# def store_data():
+#     course_dict = get_courses_pipeline([])
+
+#     file_path = Path.cwd() / "course_dict.pkl"
+#     with open(file_path, "wb") as f:
+#         pickle.dump(course_dict, f)
+
+# def load_data():
+#     file_path = Path.cwd() / "course_dict.pkl"
+
+#     # To load back:
+#     with open(file_path, "rb") as f:
+#         loaded_courses = pickle.load(f)
+#     return loaded_courses
+```

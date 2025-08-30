@@ -22,3 +22,4 @@ def prereq_total_count(prereq_str: str) -> int:
             count += 1
 
     return count
+

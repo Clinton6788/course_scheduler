@@ -1,9 +1,9 @@
-from settings import (
+from config.settings import (
     SESSIONS,
     COST_PER_SESSION,
 )
 from datetime import timedelta
-from course_enums import LevelENUM
+from src.course_enums import LevelENUM
 from src.courses import Course
 
 """DOWN AND DIRTY; Don't Perfect!"""

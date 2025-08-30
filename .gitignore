@@ -5,3 +5,5 @@ venv/
 *.sqlite
 *.sqlite3
 *.db
+
+*__pycache__

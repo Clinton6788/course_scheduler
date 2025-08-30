@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from typing import List, Optional
-from settings import (
+from config.settings import (
     COST_PER_CH_GRAD,
     COST_PER_CH_UNDERGRAD,
     COST_PER_COURSE,
     ALUMNI_SAVINGS_PERCENT
 )
-from course_enums import LevelENUM
+from src.course_enums import LevelENUM
 from functools import total_ordering
 
 @total_ordering
