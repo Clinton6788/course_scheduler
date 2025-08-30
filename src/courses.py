@@ -57,6 +57,11 @@ class Course:
         gross = self.credit_hours * m + COST_PER_COURSE
         self.cost = round(gross * p, 2)
 
+    def __repr__(self):
+            return (f"Course(course_id='{self.course_id}', level={self.level}, status={self.status}, "
+                    f"session={self.session}, priority={self.priority}, cost={self.cost})")        
+
+
     def __eq__(self, other):
         if isinstance(other, Course):
             return self.course_id == other.course_id

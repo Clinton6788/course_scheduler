@@ -146,22 +146,28 @@ class Scheduler:
         
 
         # Re sort List
-        courses.sort(key=lambda c: c.priority)
+        courses.sort(key=lambda c: c.priority, reverse=True)
 
         # Iter through and create sessions
         max_course = restraints.get(RestraintsENUM.SES_MAX_CLASS)
         while len(courses) > 0:
             # Remove active session for working
-            print(avail_sess)
             mt_ses = avail_sess.pop(0)
+            mt_ses.level = level
             ses = self._create_session(mt_ses, sat, courses, scheduled, max_course)
             # Confirm restraints
             if not self._is_valid_session(ses, restraints):
                 raise RuntimeError(f"Invalid Session||{ses}")
             
+            # print(f"STATUS: Session={ses}\nSession Has={[c for c in ses.courses]}\n"
+            #       f"Current Courses= {courses}")
             # Move assigned courses
             for c in ses.courses:
-                courses.remove(c)
+                # print("Course: ", c)
+                # print("COURSES: ", len(courses))
+                # for i in courses:
+                #     print(c.course_id)
+                # courses.remove(c)
                 scheduled.append(c)
 
             # Update sessions
@@ -187,7 +193,7 @@ class Scheduler:
         ip = 0 # Inperson iterations
         t = len(inperson_sat) + len(courses) # Total allowed
         i = 0 # Total iterations
-        while len(ses.courses) < max_course:
+        while len(ses.courses) < max_course and len(courses) > 0:
             # Fail early
             if i > t:
                 raise RuntimeError(f"Failed to schedule session||{ses}||{courses=}")
@@ -205,8 +211,16 @@ class Scheduler:
 
             # Attempt to slot course:
             if self.unsatisfied_prereqs(c, scheduled) == []:
-                # Prereqs satisfied, schedule and resest iters
-                ses.add_course(c)
+                # Prereqs satisfied, schedule, remove and resest iters
+                if not c in ses.courses:
+                    ses.add_course(c)
+                    if p:
+                        inperson = True
+
+                if c in inperson_sat:
+                    inperson_sat.remove(c)
+                if c in courses:
+                    courses.remove(c)
                 ic = 0
                 ip = 0
                 i = 0

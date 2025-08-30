@@ -25,20 +25,24 @@ def store_data():
         pickle.dump(course_dict, f)
 
 def load_data():
+    file_path = Path.cwd() / "course_dict.pkl"
+
     # To load back:
     with open(file_path, "rb") as f:
         loaded_courses = pickle.load(f)
+    return loaded_courses
 
 
 
 def run_main():
-    store_data()
+    course_dict = load_data()
     # course_dict = get_courses_pipeline(IN_PERSON)
 
-    # print(course_dict)
-    # s = Scheduler()
-    # s.schedule_courses(courses=course_dict, restraints=RESTRAINTS, inperson=IN_PERSON)
-    # print(s.sessions)
+    print(course_dict)
+    s = Scheduler()
+    s.schedule_courses(courses=course_dict, restraints=RESTRAINTS, inperson=IN_PERSON)
+    for _, ses in s.sessions.items():
+        print(f"Session {ses}")
 
 if __name__ == '__main__':
     run_main()

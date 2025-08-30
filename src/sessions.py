@@ -31,6 +31,11 @@ class Session:
         self._calc_dates()
 
     # region Comp Dunders
+    def __repr__(self):
+        course_ids = [c.course_id for c in self._courses]
+        return f"Session {self._num}: {course_ids}"
+    
+
     def _get_comp_val(self, other):
         if isinstance(other, Session):
             return other._num
