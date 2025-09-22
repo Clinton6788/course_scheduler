@@ -15,15 +15,8 @@ class CourseFilterENUM(IntEnum):
     INTENT = 2
     CAPSTONE = 3
 
-class RestraintsENUM(IntEnum):
-    # Any changes must be reflected in src.scheduler > Scheduler._is_valid_schedule()
-    FIRST_SES_INPERSON = 0 
-    SES_COST_COVERED = 1    
-    SES_MAX_CLASS = 2       
-
 class SessErrENUM(IntEnum):
     NOT_INPERSON = 0
-    COST_NOT_COVERED = 1
-    OVER_MAX_CLASS = 2
+    OVER_MAX_COST = 1
     OUT_OF_BENEFITS = 3
     PREREQ_NOT_MET = 4

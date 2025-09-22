@@ -3,8 +3,8 @@ from config.settings import (
     COST_PER_SESSION,
 )
 from datetime import timedelta
-from src.course_enums import LevelENUM
-from src.courses import Course
+from config.course_enums import LevelENUM
+from src.course import Course
 
 """DOWN AND DIRTY; Don't Perfect!"""
 

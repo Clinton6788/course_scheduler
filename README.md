@@ -1,5 +1,20 @@
 # Class Scheduler 
 
+Welcome to the class scheduler. While this was designed for personal use, it can easily be modified, or even used right out of the box. 
+
+## Summary
+**This program allows users to create a course schedule, factoring in: GI Bill, user defined restraints, prerequisites and user defined priorities.**   
+
+---
+
+### A Note of Caution
+It is (generally) an unpolished program, with easy access to settings capable of breaking the function, as well as a very harsh enforcement/validation. Be careful when changing settings, and operate through the CLI unless comfortable. It was designed to be fairly modular and easy to adapt to each user's and school's situation, as well as easy to integrate with a database (for school use). Most classes are coupled loosely, if at all. 
+
+> **IMPORTANT:** Validation is generally simple `type` enforcement. PROGRAM IS NOT DESIGNED TO HAVE UNTRUSTED INPUT. If using with a database and/or FE, ensure proper validation of all inputs.
+
+---
+---
+
 ## User Stories
 **As a user, I want to be able to...**
 - Import classes from .csv or add classes manually

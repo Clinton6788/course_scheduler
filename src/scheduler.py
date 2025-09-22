@@ -1,4 +1,9 @@
-from src.course_enums import CourseFilterENUM as FilterENUM, LevelENUM, StatusENUM, RestraintsENUM
+from config.course_enums import (
+    CourseFilterENUM as FilterENUM, 
+    LevelENUM, 
+    StatusENUM, 
+    RestraintsENUM
+    )
 from src.sessions import Session
 import datetime as dt
 from config.settings import (
@@ -16,7 +21,7 @@ from config.settings import (
     MAX_RECURSION
     )
 import pandas as pd
-from src.courses import Course
+from src.course import Course
 from src.finances import FinanceMGR
 
 class Scheduler:
@@ -55,18 +60,21 @@ class Scheduler:
         self._verify_course_dict(courses)
         print("Verification Passed")
 
-        # Prep avail sessions
+        # Prep avail sessions (Sessions that the program will see as "free")
         for k,v in SESSIONS.items():
             if v >= dt.date.today():
                 self.avail_ses.append(Session(k))
+                # print(f"Available Sessions: {self.avail_ses}")
 
         # Get easily workable structures
         working_courses = []
         for lev, filtered_dict in courses.items():
             working_courses.append((lev, filtered_dict))
+        # print(f"Working Courses: {working_courses}")
 
         # Assign fixed to sessions (completed, inprogress, set)
         self._assign_fixed(working_courses)
+        print(f"Assigned: {self.scheduled}")
 
         # Init and pre-load finmgr with historical sessions (started on/before today)
         today = dt.date.today()
@@ -283,6 +291,7 @@ class Scheduler:
         for t in working_courses:
             level, courses = t
             fixed = courses.get(FilterENUM.SET_SESSION, None)
+            print(f"FIXED: {fixed}")
 
             if fixed is None:
                 continue
