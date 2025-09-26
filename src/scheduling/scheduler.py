@@ -2,27 +2,19 @@ from config.course_enums import (
     CourseFilterENUM as FilterENUM, 
     LevelENUM, 
     StatusENUM, 
-    RestraintsENUM
     )
-from src.sessions import Session
+from src.scheduling.sessions import Session
 import datetime as dt
 from config.settings import (
-    SESSIONS,
-    GRANT_OPP,
-    GRANT_PELL,
-    GI_BILL,
-    SEMESTERS_PER_YEAR,
-    SESSIONS_PER_SEMESTER,
     COST_PER_CH_GRAD,
     COST_PER_CH_UNDERGRAD,
     COST_PER_COURSE,
     COST_PER_SESSION,
     ALUMNI_SAVINGS_PERCENT,
-    MAX_RECURSION
     )
 import pandas as pd
-from src.course import Course
-from src.finances import FinanceMGR
+from src.scheduling.course import Course
+from src.user.gi_bill import FinanceMGR
 
 class Scheduler:
     def __init__(self):

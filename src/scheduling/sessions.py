@@ -1,24 +1,31 @@
 from config.settings import (
-    SESSIONS,
     COST_PER_SESSION,
+    SESSION_LENGTH,
+    SESSION_START_DAY
 )
-from datetime import timedelta
+import datetime as dt
 from config.course_enums import LevelENUM
-from src.course import Course
+from src.scheduling.course import Course
+from src.helpers import round_to_nearest_weekday_start
 
 """DOWN AND DIRTY; Don't Perfect!"""
 
 class Session:
     """Represents one session. Outside of init, all changes must be made through Session.modify()."""
-    def __init__(self, session_num: int):
+    def __init__(self, session_num: int, start_date: dt.date, target_month: int):
         # Define for easy location
         self._num = session_num
         self.level = None
         self._courses = []
-        self._intent = [] # 'Free' classes intend to be completed outside college
+        self._intent = []       # Courses intended to be completed outside sessions (challenge, transfer)
 
-        self._start_date = None
-        self._end_date = None
+        self._start_date = round_to_nearest_weekday_start(
+                                start_date, 
+                                target_month,
+                                SESSION_START_DAY,
+                                )
+        self._end_date = self.start_date + dt.timedelta(weeks=SESSION_LENGTH)
+        self._month = target_month
 
         self._tot_courses = 0
         self._tot_ch = 0
@@ -27,8 +34,6 @@ class Session:
 
         self._pre_reqs = []
 
-        # Calc Values
-        self._calc_dates()
 
     # region Comp Dunders
     def __repr__(self):
@@ -60,9 +65,6 @@ class Session:
         return self._num != self._get_comp_val(other)
     # endregion
 
-    def _calc_dates(self):
-        self._start_date = SESSIONS.get(self.num)
-        self._end_date = self.start_date + timedelta(weeks=8)
 
     def _calc_courses(self):
         self._tot_cost = COST_PER_SESSION

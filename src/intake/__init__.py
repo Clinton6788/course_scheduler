@@ -31,7 +31,6 @@ def get_courses_pipeline(
         create_courses,
         organize_courses,
         prioritize_courses,
-        filter_courses
     )
     from src.intake.intake import fetch_data
 
@@ -63,7 +62,7 @@ def get_courses_pipeline(
         k: prioritize_courses(v,in_person=in_person)
         for k, v in org_by_level_dict.items()
     }
-    # -> {LevelENUM: [Course, Course, ...], ...}
+    # {LevelENUM: [Course, Course, ...], ...}
 
     # Filter courses per level into FilterENUM categories
     final_dict = {
@@ -72,4 +71,9 @@ def get_courses_pipeline(
     }
     # -> {LevelENUM: {FilterENUM: [Courses], ...}, ...}
 
-    return final_dict
+    # Flatten all courses
+    out = []
+    for _, v in final_dict:
+        out.extend(v)
+
+    return out

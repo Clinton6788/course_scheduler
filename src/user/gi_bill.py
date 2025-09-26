@@ -10,7 +10,7 @@ from config.settings import (
 )
 from dataclasses import dataclass
 import datetime as dt
-from src.sessions import Session
+from src.scheduling.sessions import Session
 
 @dataclass
 class BenefitYear:

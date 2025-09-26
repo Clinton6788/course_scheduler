@@ -1,4 +1,4 @@
-from src.course import Course
+from src.scheduling.course import Course
 from config.course_enums import (
     StatusENUM,
     LevelENUM,
@@ -166,33 +166,3 @@ def topo_sort_with_priority(courses: dict) -> list:
     # Return sorted Course objects by priority descending
     return sorted(courses.values(), key=lambda c: c.priority, reverse=True)
 
-
-def filter_courses(courses: list) -> dict:
-    """Filters courses into dict with CourseFilterENUM key and list of courses.
-    Maintains list order of 'courses' arg.
-    """
-    print("Filtering Courses...")
-    filtered_courses = {i.value: [] for i in FILT}
-
-    for c in courses:
-        print(f"Course {c.course_id} has session {c.session}")
-        if (c.status == StatusENUM.COMPLETED) or isinstance(c.session, int):
-            filtered_courses[FILT.SET_SESSION].append(c)
-            print(f"Filtered Course: {c.course_id} as SET\n")
-        elif c.challenge_intent:
-            if not c.challenge_avail:
-                print(f"Intent but not avail || {c.course_id=}")
-            else:
-                filtered_courses[FILT.INTENT].append(c)
-        elif c.transfer_intent:
-            if not c.transfer_avail:
-                print(f"Intent but not avail || {c.course_id=}")
-            else:
-                filtered_courses[FILT.INTENT].append(c)
-        elif c.capstone:
-            filtered_courses[FILT.CAPSTONE].append(c)
-        else:
-            filtered_courses[FILT.FREE].append(c)
-
-    print("Filtering Complete")
-    return filtered_courses

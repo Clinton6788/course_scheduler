@@ -69,4 +69,7 @@ class Course:
             return self.course_id == other
 
     def __lt__(self, other):
-        return self.priority < other.priority
+        if isinstance(other, Course):
+            return self.priority < other.priority
+        else:
+            return self.priority < other

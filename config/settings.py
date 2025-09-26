@@ -1,5 +1,4 @@
 from datetime import date
-from config.course_enums import RestraintsENUM as R
 
 """------------Defaults------------"""
 # ALL displayed here are DEFAULTS only (For rapid/set configs).
@@ -25,9 +24,6 @@ class RestraintsENUM():
 
 """------------Config-----------"""
 IN_PERSON_PRIORITY = 10         # Base amount to raise priority of in person classes
-SESSIONS_PER_SEMESTER = 2
-SEMESTERS_PER_YEAR = 3
-
 
 """---------Current Course Costs----------"""
 COST_PER_SESSION = 40
@@ -37,23 +33,46 @@ COST_PER_CH_GRAD = 776
 ALUMNI_SAVINGS_PERCENT = 20     # Whole percentage; Ex: '20' for 20%.... NOT 0.2.... **ONLY APPLIES TO GRAD LEVEL**
 
 
-"""----------Sessions Start Dates------------"""
-SESSIONS = {
-    1: date(2025, 5, 5),   
-    2: date(2025, 7, 7),   
-    3: date(2025, 9, 1),   
-    4: date(2025, 10, 27), 
-    5: date(2026, 1, 5),   
-    6: date(2026, 3, 2),   
-    7: date(2026, 5, 4),   
-    8: date(2026, 7, 6),   
-    9: date(2026, 9, 7),   
-    10: date(2026, 11, 2), 
-    11: date(2027, 1, 4),  
-    12: date(2027, 3, 1),  
-    13: date(2027, 5, 3),  
-    14: date(2027, 7, 5),  
-}
+"""----------Sessions ------------"""
+
+"""NOTE: Start all sessions on "IDEAL" month, not actual. Holidays will be auto-factored 
+and rounded to nearest SESSION_START_DAY.
+
+It is possible for this to be slightly off from actual schedule, resulting in slightly
+mis-calculated GIB benefit usage. This is known, understood and disregarded.
+
+Current, hard-coded max deviation is +- 1 week from target start date. If holidays prevent
+this from happening, holidays will be ignored and closest date will be applied.
+"""
+
+# INT list of months which start new session (ACTUAL int: 6 for june, etc.)
+SESSION_MONTHS = [
+    1,
+    3,
+    5,
+    7,
+    9,
+    11,
+]
+
+SESSION_LENGTH = 8              # Length of sessions (as weeks); int only
+SESSION_START_DAY = 6           # INT representation of weekday. Monday = 0
+
+# List of holidays to be ignored (If start date falls on holiday weekend)
+# NOTE: Recommend commenting out unused rather than deleting, for future reference.
+SESSION_HOLIDAYS = [
+    "new_year",
+    "mlk_day",
+    "presidents_day",
+    "memorial_day",
+    "juneteenth",
+    "independence_day",
+    "labor_day",
+    "columbus_day",
+    "veterans_day",
+    "thanksgiving",
+    "christmas",
+]
 
 """-----------Financial Aid--------------"""
 # Grants are PER SESSION
