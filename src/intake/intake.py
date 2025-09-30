@@ -1,7 +1,6 @@
 import pandas as pd
 from config.course_enums import StatusENUM, LevelENUM
 from config.settings import (
-    SESSIONS, 
     IN_PERSON_PRIORITY,
 )
 from pathlib import Path

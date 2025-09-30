@@ -55,7 +55,7 @@ SESSION_MONTHS = [
     11,
 ]
 
-SESSION_LENGTH = 8              # Length of sessions (as weeks); int only
+SESSION_WEEKS = 8              # Length of sessions (as weeks); int only
 SESSION_START_DAY = 6           # INT representation of weekday. Monday = 0
 
 # List of holidays to be ignored (If start date falls on holiday weekend)
@@ -74,15 +74,3 @@ SESSION_HOLIDAYS = [
     "christmas",
 ]
 
-"""-----------Financial Aid--------------"""
-# Grants are PER SESSION
-GRANT_PELL = 1849
-GRANT_OPP = 250
-
-# GI Bill
-GI_BILL = 27120 # YEARLY Amount of Coverage
-GI_BILL_START = (8, 1) # Month, Day
-GI_BILL_END = (7, 31) # Month, Day
-
-BENEFITS_TIME = (23, 10) # Months, Days of Benefits Remaining
-BENEFITS_ASOF = date(2025, 8, 27) # Date BENEFITS_TIME updated

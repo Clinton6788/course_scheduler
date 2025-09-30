@@ -1,10 +1,7 @@
 from config.course_enums import LevelENUM as L
 from .restraints import Restraints
 import datetime as dt
-
-
-class GIB:
-    pass
+from.gib import GIB
 
 class User:
     import src.scheduling as sch
@@ -50,6 +47,7 @@ class User:
         # Default inits
         self.is_scheduled = False
         self.free_sessions = []
+        self.assigned_courses = []
 
 
         # Create sessions, assign completed or set courses to sessions.

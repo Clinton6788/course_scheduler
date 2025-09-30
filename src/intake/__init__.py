@@ -2,7 +2,7 @@
 def get_courses_pipeline(
         course_path: str,
         course_path_abs: bool,
-        in_person: list|None|str,
+        in_person: list|None|str = None,
 
         ) -> dict:
     """
@@ -65,15 +65,15 @@ def get_courses_pipeline(
     # {LevelENUM: [Course, Course, ...], ...}
 
     # Filter courses per level into FilterENUM categories
-    final_dict = {
-        k: filter_courses(v)
-        for k, v in prioritized_dict.items()
-    }
+    # final_dict = {
+    #     k: filter_courses(v)
+    #     for k, v in prioritized_dict.items()
+    # }
     # -> {LevelENUM: {FilterENUM: [Courses], ...}, ...}
 
     # Flatten all courses
     out = []
-    for _, v in final_dict:
-        out.extend(v)
+    for _, l in prioritized_dict.items():
+        out.extend(l)
 
     return out
