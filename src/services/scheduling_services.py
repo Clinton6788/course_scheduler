@@ -74,7 +74,6 @@ def generate_restraints(**kwargs) -> Restraints:
 
     return Restraints(**kwargs)
 
-
 def export_schedule(
     user: User, 
     format: str = "csv", 
@@ -91,12 +90,15 @@ def export_schedule(
 
     with open(output_path, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Session", "Courses", "Intent Courses", "Start Date"])
+        writer.writerow(["Session", "Start Date", "Courses", "Intent Courses", "Total CH", "Total Cost", "User Cost"])
 
         for session in user.schedule:
             session_num = session.num
             course_ids = ', '.join(course.id for course in session.courses)
             intent_ids = ', '.join(course.id for course in session.intent_courses)
             start_date = session.start_date.isoformat() if hasattr(session.start_date, 'isoformat') else session.start_date
+            total_ch = session.tot_ch
+            total_cost = session.tot_cost
+            user_cost = session.adj_cost
 
-            writer.writerow([session_num, start_date, course_ids, intent_ids])
+            writer.writerow([session_num, start_date, course_ids, intent_ids, total_ch, total_cost, user_cost])
