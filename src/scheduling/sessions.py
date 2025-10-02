@@ -1,7 +1,7 @@
 from config.settings import (
     COST_PER_SESSION,
-    SESSION_LENGTH,
-    SESSION_START_DAY
+    SESSION_START_DAY,
+    SESSION_WEEKS
 )
 import datetime as dt
 from config.course_enums import LevelENUM
@@ -24,7 +24,7 @@ class Session:
                                 target_month,
                                 SESSION_START_DAY,
                                 )
-        self._end_date = self._start_date + dt.timedelta(weeks=SESSION_LENGTH)
+        self._end_date = self._start_date + dt.timedelta(weeks=SESSION_WEEKS)
         self._month = target_month
 
         self._tot_courses = 0

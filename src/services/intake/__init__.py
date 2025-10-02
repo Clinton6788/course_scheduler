@@ -27,12 +27,12 @@ def get_courses_pipeline(
             }
     """
     # Imports to avoid high-level exposure
-    from src.intake.org import (
+    from src.services.intake.org import (
         create_courses,
         organize_courses,
         prioritize_courses,
     )
-    from src.intake.intake import fetch_data
+    from src.services.intake.intake import fetch_data
 
     # Quick Validation:
     msg = "Get Courses Pipeline||Improper Arg: "

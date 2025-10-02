@@ -6,6 +6,7 @@ from config.course_enums import (
 )
 import pandas as pd
 import re
+from config.settings import CAPSTONE_PRIORITY, IN_PERSON_PRIORITY
 
 def parse_prereqs(prereq_str: str) -> list:
     """
@@ -105,7 +106,15 @@ def prioritize_courses(courses: dict, in_person: list = []) -> list:
     for c in courses.values():
         c.priority = 0
 
-    return topo_sort_with_priority(courses) 
+    pri_courses = topo_sort_with_priority(courses) 
+    # Adjust for capstone, inperson
+    for c in pri_courses:
+        if c.capstone:
+            c.priority -= CAPSTONE_PRIORITY
+        if c in in_person:
+            c.priority += IN_PERSON_PRIORITY
+
+    return pri_courses
 
 
 from collections import defaultdict, deque
@@ -160,6 +169,8 @@ def topo_sort_with_priority(courses: dict) -> list:
     for cid in courses:
         if visited.get(cid) is None:
             dfs(cid)
+
+
 
     # Return sorted Course objects by priority descending
     return sorted(courses.values(), key=lambda c: c.priority, reverse=True)

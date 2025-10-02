@@ -1,31 +1,10 @@
 from datetime import date
 
-"""------------Defaults------------"""
-# ALL displayed here are DEFAULTS only (For rapid/set configs).
+"""------------Sorting-----------"""
+IN_PERSON_PRIORITY = 5          # Base amount to raise priority of in person classes
+CAPSTONE_PRIORITY = 5           # Base amount to LOWER priority of capstone class
 
-# Path for course spreadsheet. 
-# Accepts Filetypes: csv, xls, xlsx
-COURSES_PATH = "course_input.csv"
-ABSOLOUTE_PATH = False              # Bool, Is path absoloute; False for relative
-
-class RestraintsENUM():
-    # Session Restraints
-    SES_MIN_INPERSON = 0
-    SES_COST_COVERED = 1    
-    SES_MAX_CLASS = 2    
-    SES_MIN_CLASS = 3
-    SES_MONTHS = 4
-    SES_MAX_COST = 5
-    SES_MAX_CH = 6
-    SES_MIN_CH = 7
-    SES_FIRST_ONLY_INPERSON = 8
-
-
-
-"""------------Config-----------"""
-IN_PERSON_PRIORITY = 10         # Base amount to raise priority of in person classes
-
-"""---------Current Course Costs----------"""
+"""---------Current Course/Session Costs----------"""
 COST_PER_SESSION = 40
 COST_PER_COURSE = 100           # Additional costs only (outside of cost/ch)
 COST_PER_CH_UNDERGRAD = 514

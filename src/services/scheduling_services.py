@@ -9,7 +9,6 @@ def generate_schedule(
     user: User, 
     restraints: Optional[Restraints] = None, 
     spread_between: Optional[int] = None,
-    export_to: Optional[str] = None,
     **kwargs) -> None:
     """
     Generates a schedule for a user, using a Restraints object or individual kwargs.
@@ -30,11 +29,13 @@ def generate_schedule(
     # Create sessions
     Sch.create_all_sessions(user, restraints)
 
+    print(f"User Sessions: {user.schedule}|||{user.free_sessions}")
+
     # Schedule Set courses
     Sch.schedule_set(user)
 
     # Schedule Session Levels
-    Sch._plan_session_levels(user, restraints, spread_between)
+    # Sch._plan_session_levels(user, restraints, spread_between)
 
     # Update GI Bill before generating sessions
     if hasattr(user, "gib") and user.gib:
@@ -42,11 +43,8 @@ def generate_schedule(
         user.gib.charge_historical(completed)
 
     # Schedule Free courses or Raise (inside scheduler)
-    Sch.schedule_free(user, restraints, spread_between)
+    Sch.schedule_free(user, restraints)
 
-    # Export/print schedule if desired
-    if export_to:
-        export_schedule(user, export_to)
 
 def generate_restraints(**kwargs) -> Restraints:
     """
@@ -94,8 +92,8 @@ def export_schedule(
 
         for session in user.schedule:
             session_num = session.num
-            course_ids = ', '.join(course.id for course in session.courses)
-            intent_ids = ', '.join(course.id for course in session.intent_courses)
+            course_ids = ', '.join(course.course_id for course in session.courses)
+            intent_ids = ', '.join(course.course_id for course in session.intent)
             start_date = session.start_date.isoformat() if hasattr(session.start_date, 'isoformat') else session.start_date
             total_ch = session.tot_ch
             total_cost = session.tot_cost

@@ -35,8 +35,6 @@ def create_new_user(
     if first_ses_dt is not None:
         if not isinstance(first_ses_dt, dt.date):
             raise TypeError("first_ses_dt must be a datetime.date instance.")
-        if first_ses_dt < dt.date.today():
-            raise ValueError("first_ses_dt cannot be in the past.")
 
     if courses is not None and not isinstance(courses, list):
         raise TypeError("courses must be a list of Course instances or None.")
@@ -62,7 +60,7 @@ def create_new_user(
         user_id = ShortUUID.uuid()
 
     # Construct User, ensure GIB update
-    u = User(
+    return User(
         user_id=user_id,
         first_ses_dt=first_ses_dt,
         all_courses=courses,
@@ -70,8 +68,6 @@ def create_new_user(
         grants_per_ses=grant_amnt_per_ses,
         gib=gib
     )
-    Scheduler.schedule_set(u)
-    u.gib.charge_historical(u.completed_sessions)
 
 def modify_user(
     user: User,

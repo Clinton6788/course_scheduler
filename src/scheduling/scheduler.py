@@ -1,3 +1,4 @@
+from __future__ import annotations
 from .course import Course
 from .sessions import Session
 from .restraints import Restraints
@@ -12,14 +13,6 @@ class SchedulingError(Exception):
 
 
 class Scheduler:
-    from src.user import User
-    """Need to 
-    create sessions
-    compare to existing sessions, discard any the already exist
-    schedule set courses
-    schedule by level
-        schedule by restraints
-    """
 
     @classmethod
     def create_all_sessions(cls, user: User, restraints: Restraints) -> None:
@@ -32,6 +25,7 @@ class Scheduler:
             restraints (Restraints): Restraints instance with all applicable 
                 fields.
         """
+        from src.user import User
         print(f"Creating sessions for {user.id_}...")
         r = restraints
         u = user
@@ -40,14 +34,23 @@ class Scheduler:
         under_count = sum(1 for c in u.courses if c.level == LevelENUM.UNDERGRAD)
         grad_count = sum(1 for c in u.courses if c.level == LevelENUM.GRADUATE)
 
-        # Calculate required sessions
-        under_ses = under_count // r.ses_min_class + (1 if under_count % r.ses_min_class else 0)
-        grad_ses = grad_count // r.ses_min_class + (1 if grad_count % r.ses_min_class else 0)
+        # Calculate required sessions using max_per_ses to minimize extra sessions
+        under_ses = (under_count + r.ses_max_class - 1) // r.ses_max_class
+        grad_ses = (grad_count + r.ses_max_class - 1) // r.ses_max_class
 
-        # Limit by GI Bill if exists
+        print(f"GRADSESSIONS: {grad_ses} _____ GRADCOUNT: {grad_count}")
+
+        # Ensure at least 1 session if any courses exist
+        under_ses = max(under_ses, 1) if under_count > 0 else 0
+        grad_ses = max(grad_ses, 1) if grad_count > 0 else 0
+
+        # Limit by GI Bill if exists and is limiting
         if hasattr(u, "gib") and u.gib:
             session_days = SESSION_WEEKS * 7
-            max_sessions_possible = u.gib.get_remaining_days() // session_days
+            if r.exceed_benefits is False:
+                max_sessions_possible = u.gib.get_remaining_days() // session_days
+            else:
+                max_sessions_possible = under_ses + grad_ses  # --------------- Modified
             total_ses = under_ses + grad_ses
 
             if total_ses > max_sessions_possible:
@@ -104,11 +107,15 @@ class Scheduler:
 
         # Remove any existing sessions by number
         full_sessions = [s for s in full_sessions if s not in u.schedule]
+        print("FULL SESSIONS")
+        for s in full_sessions:
+            print(f"FULL SESSIONS_______{s.num}: {s.level}")
 
         # Sort sessions by start date
         u.free_sessions = sorted(full_sessions, key=lambda s: s.start_date)
 
         print("Sessions creation complete.")
+        print(f"-----SESSIONS-----\n {u.free_sessions}")
 
     @classmethod
     def schedule_set(cls, user: User) -> None:
@@ -121,6 +128,7 @@ class Scheduler:
             user (User): User instance with all potential Course objects in 
                 attr 'user.courses'.
         """
+        from src.user import User
         print(f"Scheduling set courses for {user.id_}...")
 
         # Find set courses
@@ -133,6 +141,9 @@ class Scheduler:
             # Handle set courses
             # Get session
             try:
+                print(f"-----Getting for {c.course_id}-----")
+                print(user.schedule)
+                print(user.free_sessions)
                 i = user.schedule.index(c.session)
                 ses = user.schedule.pop(i)
             except ValueError:
@@ -174,11 +185,22 @@ class Scheduler:
         """
         # Clean up and copy for scheduling use
         r = restraints
-        under_courses = [c for c in user.courses if c not in user.assigned_courses and c.level == LevelENUM.UNDERGRAD]
-        grad_courses = [c for c in user.courses if c not in user.assigned_courses and c.level == LevelENUM.GRADUATE]
+        under_courses = [c for c in user.courses if (
+                c not in user.assigned_courses and c.level == LevelENUM.UNDERGRAD)]
+        
+        print(f"-----ASSIGNED---- {user.assigned_courses}")
+
+        grad_courses = [c for c in user.courses if (
+                c not in user.assigned_courses and c.level == LevelENUM.GRADUATE)]
+        
         user.free_sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
+
         under_ses = [s for s in user.free_sessions if s.level == LevelENUM.UNDERGRAD]
         grad_ses = [s for s in user.free_sessions if s.level == LevelENUM.GRADUATE]
+        print(f"________GRADSES:________{grad_ses}")
+        print(f"_____________FREE SES__________")
+        for s in user.free_sessions:
+            print(f"\n{s.num}: {s.level}") # ----------------------------------- All levels at 0 here
 
         # Schedule undergrad first if avail:
         if under_courses or under_ses:
@@ -189,13 +211,14 @@ class Scheduler:
         # Schedule graduate if available
         if grad_courses or grad_ses:
             if not (grad_courses and grad_ses):
+                print(f"Grad Courses: {grad_courses}\n Grad Ses: {grad_ses}")
                 raise SchedulingError("Graduate courses vs session discrepancy.")
             cls._schedule_level(user, grad_courses, grad_ses, restraints)
 
         # --- Put Intent in correct Session ---
         # Get intent courses, map
         intent_courses = [c for c in user.courses if c.challenge_intent or c.transfer_intent]
-        intent_map = {c.id: c for c in intent_courses}
+        intent_map = {c.course_id: c for c in intent_courses}
         
         # Ensure sessions in order
         user.schedule.sort()
@@ -206,11 +229,11 @@ class Scheduler:
             s_curr = user.schedule[i]
 
             for c in s_curr.courses:
-                if not c.prereqs:
+                if not c.pre_reqs:
                     continue
 
                 # Find which intent courses used in prereqs
-                matched_ids = cls._extract_matching_prereqs(c.prereqs, set(intent_map))
+                matched_ids = cls._extract_matching_prereqs(c.pre_reqs, set(intent_map))
 
                 for matched_id in matched_ids:
                     s_prev.add_intent(intent_map[matched_id])
@@ -227,23 +250,6 @@ class Scheduler:
         """Internal method to handle individual scheduling. Must be called from schedule_free.
         Niave, assumes all validation has been passed.
         """
-        # Get targets
-        tgt_list = cls._get_course_targets(
-                            len(courses),
-                            len(sessions),
-                            r.ses_min_class,
-                            r.ses_max_class
-                        )
-
-        sessions.sort()
-        courses.sort()
-
-        gib = False
-        if hasattr(user, "gib") and user.gib:
-            gib = True
-
-        user.assigned_courses
-        
         # Assume all challenges are taken
         i = 0
         while i < len(courses):
@@ -251,6 +257,28 @@ class Scheduler:
                 user.assigned_courses.append(courses.pop(i))
             else:
                 i += 1
+
+        # Get targets
+        tgt_list = cls._get_course_targets(
+                            len(courses),
+                            len(sessions),
+                            r.ses_min_class,
+                            r.ses_max_class
+                        )
+        
+        # Filter sessions to match tgt_list length
+        sessions = sessions[:len(tgt_list)]
+
+        print(f"{tgt_list=}")
+        print(f"Total Courses:", len(courses))
+        sessions.sort()
+        courses.sort(reverse=True)
+
+        gib = False
+        if hasattr(user, "gib") and user.gib:
+            gib = True
+
+        print(f"--------SESSIONS-------{sessions}")
 
                 
         # Schedule
@@ -264,7 +292,7 @@ class Scheduler:
             )
             # Get pre-req qualified courses
             qual = cls._get_satisfied_prereqs(courses,user.assigned_courses)
-            qual.sort()
+            qual.sort(reverse=True)
 
             # Ensure inperson met
             if r.inperson_courses:
@@ -284,7 +312,9 @@ class Scheduler:
 
             # Create course list after inperson satisfied
             while len(ses_courses) < course_tgt:
+                print(f"Qualified for {s}: {[c.course_id for c in qual]}")
                 if len(qual) < 1:
+                    print(ses_courses, qual, course_tgt)
                     raise SchedulingError(f"Out of pre-req qualified courses||{s}")
                 c = qual.pop(0)
                 ses_courses.append(c)
@@ -318,7 +348,7 @@ class Scheduler:
             user.assigned_courses.extend(ses_courses)
 
             # Remove scheduled courses and sessions
-            sessions.remove(s)
+            # sessions.remove(s) # Causing skipping....Dumbass
             for c in ses_courses:
                 courses.remove(c)
 
@@ -352,89 +382,99 @@ class Scheduler:
         n_courses, 
         n_sessions, 
         min_per_ses, 
-        max_per_ses):
-        # Early checks
+        max_per_ses
+    ) -> list[int]:
         if n_courses < n_sessions * min_per_ses:
             raise ValueError("Too few courses to meet minimum per session.")
         if n_courses > n_sessions * max_per_ses:
             raise ValueError("Too many courses to stay under maximum per session.")
 
-        # Start with floor division
-        base = n_courses // n_sessions
-        remainder = n_courses % n_sessions
+        targets = []
+        remaining = n_courses
 
-        targets = [base] * n_sessions
-
-        # Distribute the remainder without exceeding max_per_ses
-        for i in range(remainder):
-            if targets[i] < max_per_ses:
-                targets[i] += 1
+        for _ in range(n_sessions):
+            if remaining >= max_per_ses:
+                targets.append(max_per_ses)
+                remaining -= max_per_ses
+            elif remaining >= min_per_ses:
+                targets.append(remaining)
+                remaining = 0
             else:
-                # Overflow, find next session that can accept more
-                for j in range(i+1, n_sessions):
-                    if targets[j] < max_per_ses:
-                        targets[j] += 1
-                        break
+                break  # can't fill another valid session
 
-        # Final check (optional safety)
-        for t in targets:
-            if not (min_per_ses <= t <= max_per_ses):
-                raise ValueError("Cannot distribute courses within min/max bounds.")
+        # Fix last session if it's below min_per_ses
+        for i in reversed(range(1, len(targets))):
+            if 0 < targets[i] < min_per_ses:
+                needed = min_per_ses - targets[i]
+                for j in range(i):
+                    if targets[j] > min_per_ses:
+                        take = min(needed, targets[j] - min_per_ses)
+                        targets[j] -= take
+                        targets[i] += take
+                        needed -= take
+                        if needed == 0:
+                            break
 
-        return targets
+                if targets[i] < min_per_ses:
+                    raise ValueError("Cannot distribute courses while meeting min_per_ses constraint.")
+
+        # Final filter: drop sessions with 0 targets
+        return [t for t in targets if t >= min_per_ses]
         
-    @classmethod
-    def _plan_session_levels(
-        cls,
-        user: User, 
-        restraints: Restraints, 
-        spread_between: Optional[int] = None
-        ) -> None:
-        """
-        Assigns level to sessions in user.free_sessions after session creation AND set courses scheduled.
+    # @classmethod
+    # def _plan_session_levels(
+    #     cls,
+    #     user: User, 
+    #     restraints: Restraints, 
+    #     spread_between: Optional[int] = None
+    #     ) -> None:
+    #     """
+    #     Assigns level to sessions in user.free_sessions after session creation AND set courses scheduled.
 
-        Args:
-            user (User): User instance with free_sessions created.
-            restraints (Restraints): Scheduling constraints.
-            spread_between (int, optional): If provided, will spread across a fixed number of sessions.
-        """
-        r = restraints
-        under_count = sum(1 for c in user.courses if c.level == LevelENUM.UNDERGRAD and not c.session)
-        grad_count = sum(1 for c in user.courses if c.level == LevelENUM.GRADUATE and not c.session)
-        total_courses = under_count + grad_count
+    #     Args:
+    #         user (User): User instance with free_sessions created.
+    #         restraints (Restraints): Scheduling constraints.
+    #         spread_between (int, optional): If provided, will spread across a fixed number of sessions.
+    #     """
+    #     r = restraints
+    #     under_count = sum(1 for c in user.courses if c.level == LevelENUM.UNDERGRAD and not c.session)
+    #     grad_count = sum(1 for c in user.courses if c.level == LevelENUM.GRADUATE and not c.session)
+    #     total_courses = under_count + grad_count
 
-        if total_courses == 0:
-            return  # No levels to assign
+    #     if total_courses == 0:
+    #         return  # No levels to assign
 
-        # Determine session count
-        if spread_between and spread_between > 0:
-            total_sessions = spread_between
-        else:
-            under_ses = (under_count + r.ses_min_class - 1) // r.ses_min_class
-            grad_ses = (grad_count + r.ses_min_class - 1) // r.ses_min_class
-            total_sessions = under_ses + grad_ses
+    #     # Determine session count
+    #     if spread_between and spread_between > 0:
+    #         total_sessions = spread_between
+    #     else:
+    #         under_ses = (under_count + r.ses_min_class - 1) // r.ses_max_class
+    #         grad_ses = (grad_count + r.ses_min_class - 1) // r.ses_max_class
+    #         total_sessions = under_ses + grad_ses
 
-        # Limit by GI Bill
-        if hasattr(user, "gib") and user.gib and not r.exceed_benefits:
-            session_days = SESSION_WEEKS * 7
-            max_sessions = user.gib.get_remaining_days() // session_days
-            total_sessions = min(total_sessions, max_sessions)
+    #     # Limit by GI Bill
+    #     if hasattr(user, "gib") and user.gib and not r.exceed_benefits:
+    #         session_days = SESSION_WEEKS * 7
+    #         max_sessions = user.gib.get_remaining_days() // session_days
+    #         total_sessions = min(total_sessions, max_sessions)
 
-        # Get actual sessions to plan
-        sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
-        if total_sessions < len(sessions):
-            sessions = sessions[:total_sessions]
+    #     # Get actual sessions to plan
+    #     sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
+    #     if total_sessions < len(sessions):
+    #         sessions = sessions[:total_sessions]
 
-        # Compute session counts by level
-        under_ratio = under_count / total_courses if total_courses else 0
-        grad_ratio = grad_count / total_courses if total_courses else 0
+    #     # Compute session counts by level
+    #     under_ratio = under_count / total_courses if total_courses else 0
+    #     grad_ratio = grad_count / total_courses if total_courses else 0
 
-        under_ses = round(total_sessions * under_ratio)
-        grad_ses = total_sessions - under_ses
+    #     under_ses = round(total_sessions * under_ratio)
+    #     grad_ses = total_sessions - under_ses
 
-        # Assign levels to sessions
-        for i, s in enumerate(sessions):
-            s.level = LevelENUM.UNDERGRAD if i < under_ses else LevelENUM.GRADUATE
+    #     # Assign levels to sessions
+    #     print("_____________PLAN SESSION LEVELS_____________")
+    #     for i, s in enumerate(sessions):
+    #         s.level = LevelENUM.UNDERGRAD if i < under_ses else LevelENUM.GRADUATE
+    #         print(f"\n {s.num}: {s.level}")
 
     @classmethod
     def _extract_matching_prereqs(cls, prereqs: list, intent_ids):
