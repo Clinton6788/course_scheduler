@@ -1,7 +1,7 @@
 from .course import Course
 from .sessions import Session
 from .restraints import Restraints
-from config.course_enums import LevelENUM
+from config.course_enums import LevelENUM, StatusENUM
 from config.settings import SESSION_MONTHS, SESSION_WEEKS
 import datetime as dt
 from typing import Optional
@@ -112,7 +112,8 @@ class Scheduler:
 
     @classmethod
     def schedule_set(cls, user: User) -> None:
-        """Schedules all Courses with 'set' session number. This includes 
+        """Schedules all Courses with 'set' session number and "completes" all
+        courses with status "StatusENUM.COMPLETE". This includes 
         statuses: 'complete' and 'inprocess', assuming proper intake format. 
         Modifies 'User' inplace. Ensure 'create_all_sessions' called first.
 
@@ -128,6 +129,8 @@ class Scheduler:
         # Find set courses
         for c in user.courses:
             if not isinstance(c.session, int):
+                if c.status == StatusENUM.COMPLETED:
+                    user.assigned_courses.append(c)
                 continue
 
             # Handle set courses
@@ -178,7 +181,13 @@ class Scheduler:
         if under_courses or under_ses:
             if not (under_ses and under_courses):
                 raise SchedulingError("Undergrad courses vs session discrepancy.")
-            
+            cls._schedule_level(user, under_courses, under_ses, restraints)
+
+        # Schedule graduate if available
+        if grad_courses or grad_ses:
+            if not (grad_courses and grad_ses):
+                raise SchedulingError("Graduate courses vs session discrepancy.")
+            cls._schedule_level(user, grad_courses, grad_ses, restraints)
 
     @classmethod
     def _schedule_level(
@@ -206,13 +215,58 @@ class Scheduler:
         if hasattr(user, "gib") and user.gib:
             gib = True
 
+        scheduled = user.assigned_courses.copy()
         # Schedule
         for i, s in enumerate(sessions):
+            ses_courses = []
+            course_count = 0
+            # Ensure inside min, max
+            course_tgt = tgt_list[i]
+            assert r.ses_min_class <= course_tgt <= r.ses_max_class, (
+                f"Course count error||{course_tgt=}, {r.ses_max_class=}"
+                f" {r.ses_min_class=}"
+            )
+            # Get pre-req qualified courses
+            qual = cls._get_satisfied_prereqs(courses)
+
+            # Ensure inperson met
             if r.inperson_courses:
-                pass
-            # INPROGRESS
+                if not r.in_person_end_dt:
+                    raise SchedulingError("In person end date required for inperson scheduling")
+                if 
+            # Apply benefits
 
+            # Ensure inside max cost
 
+            # Ensure inside benefits
+
+            # Assign scheduled session and courses to user
+
+            # Remove scheduled courses and sessions
+
+    @classmethod
+    def _get_satisfied_prereqs(
+        cls, 
+        courses: list[Course], 
+        completed: list[Course],
+        ) -> list[Course]:
+        """
+        Returns a list of courses with prereqs met.
+        """
+        satisfied = []
+        for c in courses:
+            met = True
+            for pre in c.pre_reqs:
+                if isinstance(pre, list):  # OR group
+                    if not any(p in completed for p in pre):
+                        met = False
+                else:  # AND prerequisite
+                    if pre not in completed:
+                        met = False
+            if met:
+                satisfied.append(c)
+
+        return satisfied
 
 
     @classmethod
