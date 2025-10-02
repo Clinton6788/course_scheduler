@@ -24,9 +24,7 @@ class Course:
         dependent_count (int, optional): Number of courses dependent on this as pre-req
         capstone (bool, optional): True if the course must be in the last session for its level.
         session (Optional[int], optional): Assigned session number. Required if status is Completed or InProgress.
-        transfer_avail (bool, optional): True if available via Sophia.
         transfer_intent (bool, optional): True if intend to take via Sophia.
-        challenge_avail (bool, optional): True if available via challenge exam.
         challenge_intent (bool, optional): True if intend to take via challenge exam.
     """
     course_id: str
@@ -37,9 +35,7 @@ class Course:
     dependent_count: int = 0
     capstone: bool = False
     session: Optional[int] = None
-    transfer_avail: bool = False
     transfer_intent: bool = False
-    challenge_avail: bool = False
     challenge_intent: bool = False
     priority: int = 0
     cost: float = field(init=False)

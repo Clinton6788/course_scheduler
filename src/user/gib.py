@@ -59,12 +59,12 @@ class GIB:
             self._charge_days(s, final=True)
             self._charge_cost(s, final=True)
 
-    def charge_session(self, sess: Session, final: bool = False) -> tuple[int, float]:
+    def charge_session(self, sess: Session, final: bool = False) -> tuple[bool, float]:
         """
         Charge a single session to GI Bill benefits or simulate the impact.
 
         Returns:
-            (remaining_days, total_remaining_amount)
+            (ses covered, total charge to user)
         """
         assert isinstance(sess, Session), f"Invalid session: {type(sess)}"
 
@@ -72,35 +72,40 @@ class GIB:
             print(f"Already charged session {sess.num}")
             return
         
-        days_remaining = self._charge_days(sess, final)
-        amount_remaining = self._charge_cost(sess, final)
+        ses_covered = self._charge_days(sess, final)
+        charge_amount = self._charge_cost(sess, final)
 
         if final:
             self.charged_sessions.append(sess.num)
 
-        return days_remaining, amount_remaining
+        return ses_covered, charge_amount
 
-    def _charge_days(self, session: Session, final: bool) -> int:
+    def _charge_days(self, session: Session, final: bool) -> bool:
         """
-        Charges GI Bill days for a single session if it ends on or after `self.asof`.
+        Determines if GI Bill can cover the given session and optionally charges for it.
+
+        A session is fully covered if the user has at least one day of benefits remaining 
+        on the session's start date.
 
         Args:
             session (Session): The session to charge.
             final (bool): If True, apply the deduction permanently.
 
         Returns:
-            int: Remaining benefit days after the charge.
+            bool: True if the session is covered by GI Bill benefits, False otherwise.
         """
-        if session.end_date < self.asof:
-            return self.remaining_days
+        # If no benefit days left on the session's start date, not covered
+        if self.remaining_days <= 0 or session.start_date < self.asof:
+            return False
 
-        used = (session.end_date - session.start_date).days
-        remaining = self.remaining_days - used
+        # If at least one day left on session start, full session is covered
+        session_duration = (session.end_date - session.start_date).days
+        updated_remaining = self.remaining_days - session_duration
 
         if final:
-            self.remaining_days = remaining
+            self.remaining_days = updated_remaining
 
-        return remaining
+        return True
     
     def _charge_cost(self, session: Session, final: bool) -> float:
         """
@@ -111,10 +116,10 @@ class GIB:
             final (bool): If True, apply the deduction permanently.
 
         Returns:
-            float: Amount used from the applicable benefit year.
+            float: Amount the user must pay (0 if fully covered).
         """
         ses_date = session.start_date
-        ses_cost = session.tot_cost
+        ses_cost = session.adj_cost
 
         # Determine the benefit year start
         year_start = dt.date(ses_date.year, self.benefit_start.month, self.benefit_start.day)
@@ -132,16 +137,17 @@ class GIB:
         if year_start not in benefit_years_copy:
             benefit_years_copy[year_start] = BenefitYear(year_start, year_end, self.yearly_amount)
 
-        # Deduct and calculate amount used
+        # Apply coverage
         year = benefit_years_copy[year_start]
-        prev_amount = year.amount
-        year.amount -= ses_cost
-        used = prev_amount - year.amount
+        available = year.amount
+        coverage = min(ses_cost, available)
+        year.amount -= coverage
+        user_owes = ses_cost - coverage  # Always >= 0
 
         if final:
             self.benefit_years = benefit_years_copy
 
-        return used
+        return user_owes
 
 
 

@@ -56,9 +56,7 @@ def create_courses(df: pd.DataFrame) -> list:
             pre_reqs=parse_prereqs(row["prereqs"]),  
             capstone=row["capstone"],
             session=session_val,
-            transfer_avail=row["transfer avail"],
             transfer_intent=row["transfer intent"],
-            challenge_avail=row["challenge avail"],
             challenge_intent=row["challenge intent"]
         )
         

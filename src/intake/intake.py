@@ -18,13 +18,7 @@ COLUMN_MAP = {
     "prereqs": ["prereqs", "pre-reqs", "pre_reqs"],
     "capstone": ["capstone"],
     "session": ["session"],
-    "transfer avail": ["transfer avail", "transferavail", "transfer-avail", 
-                       "transfer_avail", "transfer available", "transferavailable", 
-                       "transfer-available", "transfer_available"],
     "transfer intent": ["transfer intent", "transferintent", "transfer-intent", "transfer_intent"],
-    "challenge avail": ["challenge avail", "challengeavail", "challenge-avail", 
-                        "challenge_avail", "challenge available", "challengeavailable", 
-                        "challenge-available", "challenge_available"],
     "challenge intent": ["challenge intent", "challengeintent", "challenge-intent", "challenge_intent"],
 }
 
@@ -118,8 +112,8 @@ def validate_df(df: pd.DataFrame) -> bool:
     if not invalid_prereqs.empty:
         raise ValueError(f"Invalid prereqs format: {invalid_prereqs.tolist()}")
 
-    # 6. capstone, transfer avail, transfer intent, challenge avail, challenge intent: must be bool
-    bool_cols = ["capstone", "transfer avail", "transfer intent", "challenge avail", "challenge intent"]
+    # 6. capstone, transfer intent, challenge intent: must be bool
+    bool_cols = ["capstone", "transfer intent", "challenge intent"]
     for col in bool_cols:
         if not pd.api.types.is_numeric_dtype(df[col]):
             raise TypeError(f"'{col}' must be numeric (0/1)")
@@ -137,7 +131,7 @@ def validate_df(df: pd.DataFrame) -> bool:
     return True
 
 
-BOOL_COLUMNS = ["capstone", "transfer avail", "transfer intent", "challenge avail", "challenge intent"]
+BOOL_COLUMNS = ["capstone", "transfer intent", "challenge intent"]
 
 def replace_bool(df: pd.DataFrame) -> pd.DataFrame:
     """Convert 0/NaN → False, 1 → True for boolean columns."""

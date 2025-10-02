@@ -2,11 +2,14 @@ from src.user import User
 from src.scheduling import Restraints, Scheduler as Sch, Session, Course
 from typing import Optional
 import datetime as dt
+import csv
+import os
 
 def generate_schedule(
     user: User, 
     restraints: Optional[Restraints] = None, 
     spread_between: Optional[int] = None,
+    export_to: Optional[str] = None,
     **kwargs) -> None:
     """
     Generates a schedule for a user, using a Restraints object or individual kwargs.
@@ -31,7 +34,7 @@ def generate_schedule(
     Sch.schedule_set(user)
 
     # Schedule Session Levels
-    Sch.plan_session_levels(user, restraints, spread_between)
+    Sch._plan_session_levels(user, restraints, spread_between)
 
     # Update GI Bill before generating sessions
     if hasattr(user, "gib") and user.gib:
@@ -41,7 +44,9 @@ def generate_schedule(
     # Schedule Free courses or Raise (inside scheduler)
     Sch.schedule_free(user, restraints, spread_between)
 
-
+    # Export/print schedule if desired
+    if export_to:
+        export_schedule(user, export_to)
 
 def generate_restraints(**kwargs) -> Restraints:
     """
@@ -70,6 +75,28 @@ def generate_restraints(**kwargs) -> Restraints:
     return Restraints(**kwargs)
 
 
-def export_schedule(user: User, format: str = "csv"):
-    pass
+def export_schedule(
+    user: User, 
+    format: str = "csv", 
+    path: str = "schedule.csv",
+    absoloute: bool = False
+):
+    if format != "csv":
+        raise ValueError(f"Unsupported format: {format}")
 
+    # Convert to absolute path if necessary
+    output_path = os.path.abspath(path) if absoloute else path
+
+    user.schedule.sort()
+
+    with open(output_path, mode='w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(["Session", "Courses", "Intent Courses", "Start Date"])
+
+        for session in user.schedule:
+            session_num = session.num
+            course_ids = ', '.join(course.id for course in session.courses)
+            intent_ids = ', '.join(course.id for course in session.intent_courses)
+            start_date = session.start_date.isoformat() if hasattr(session.start_date, 'isoformat') else session.start_date
+
+            writer.writerow([session_num, start_date, course_ids, intent_ids])
