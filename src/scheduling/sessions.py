@@ -24,7 +24,7 @@ class Session:
                                 target_month,
                                 SESSION_START_DAY,
                                 )
-        self._end_date = self.start_date + dt.timedelta(weeks=SESSION_LENGTH)
+        self._end_date = self._start_date + dt.timedelta(weeks=SESSION_LENGTH)
         self._month = target_month
 
         self._tot_courses = 0

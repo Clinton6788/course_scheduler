@@ -1,73 +1,90 @@
-@classmethod
-def schedule_set(cls, user: User, restraints: Restraints) -> None:
-    """
-    Schedule all courses with a predefined 'set' session number.
-    Updates the GI Bill before assignment, ensures sessions exist, and respects restraints.
+from src.scheduling import Restraints, Session, Course
 
-    Args:
-        user (User): User instance with courses.
-        restraints (Restraints): Scheduling constraints.
-    """
-    print(f"Scheduling set courses for {user.id_}...")
 
-    # Ensure GI Bill is up-to-date
-    if hasattr(user, "gib") and user.gib:
-        completed = [s for s in user.schedule if s.start_date <= dt.date.today()]
-        user.gib.charge_historical(completed)
 
-    # Ensure free sessions exist
-    if not user.free_sessions:
-        cls.create_all_sessions(user, restraints)
+class testy:
+    @classmethod    
+    def schedule_free(cls, user: User, restraints: Restraints, spread_between: int = None) -> None:
+        """
+        Schedules all unassigned courses according to provided restraints.
 
-    # Filter out past sessions
-    user.free_sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
+        Args:
+            user (User): User instance with courses.
+            restraints (Restraints): All applicable scheduling constraints.
+            spread_between (int): If an int is passed, sprease courses between <int> sessions.
+                Default is None (Will not spread).
 
-    assigned_courses = []
+        Raises:
+            SchedulingError: If scheduling cannot satisfy all constraints.
+        """
+        r = restraints
+        remaining_courses = [c for c in user.courses if c not in user.assigned_courses]
 
-    for course in user.courses:
-        # Skip courses without a set session
-        if not isinstance(course.session, int):
-            continue
 
-        # Find the session object
-        ses = next(
-            (s for s in user.schedule + user.free_sessions if s.ses_num == course.session),
-            None
-        )
-        if not ses:
-            raise SchedulingError(f"Set session {course.session} not found for course '{course.name}'.")
+        # Filter sessions that are in the past
+        user.free_sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
+        if not user.free_sessions:
+            raise SchedulingError("No future sessions available for scheduling.")
 
-        # Constraint checks
-        if restraints.ses_max_class and len(ses.courses) >= restraints.ses_max_class:
-            raise SchedulingError(f"Session {ses.ses_num} already has max classes.")
+        # Track in-person sessions
+        inperson_count = sum(1 for s in user.schedule if getattr(s, "inperson", False))
 
-        if hasattr(user, "gib") and user.gib:
-            session_days = SESSION_WEEKS * 7
-            if not restraints.exceed_benefits and session_days > user.gib.get_remaining_days():
-                raise SchedulingError(f"GI Bill days insufficient for session {ses.ses_num}.")
+        for course in remaining_courses:
+            assigned = False
 
-        if restraints.ses_max_cost and (getattr(ses, "total_cost", 0) + course.tot_cost) > restraints.ses_max_cost:
-            raise SchedulingError(f"Session {ses.ses_num} would exceed max cost.")
+            # Sort sessions: prioritize earliest, least loaded
+            sorted_sessions = sorted(
+                user.free_sessions,
+                key=lambda s: (len(s.courses), getattr(s, "total_cost", 0), s.start_date)
+            )
 
-        # In-person handling
-        if restraints.inperson_courses and course.name in restraints.inperson_courses:
-            if restraints.in_person_end_dt and ses.start_date > restraints.in_person_end_dt:
-                raise SchedulingError(f"Cannot schedule '{course.name}' after in-person cutoff.")
-            ses.inperson = True
+            for ses in sorted_sessions:
+                # ---- Constraint checks ----
 
-        # Assign course
-        ses.add_course(course)
-        assigned_courses.append(course)
+                # Max classes per session
+                if len(ses.courses) >= r.ses_max_class:
+                    continue
 
-        # Move session to schedule if it was in free_sessions
-        if ses in user.free_sessions:
-            user.free_sessions.remove(ses)
-            user.schedule.append(ses)
+                # Max cost
+                total_cost = getattr(ses, "total_cost", 0) + course.tot_cost
+                if r.ses_max_cost and total_cost > r.ses_max_cost:
+                    continue
 
-    # Update user's assigned courses
-    user.assigned_courses.extend(assigned_courses)
+                # GI Bill days
+                session_days = SESSION_WEEKS * 7
+                if hasattr(user, "gib") and user.gib:
+                    if not r.exceed_benefits and session_days > user.gib.get_remaining_days():
+                        continue
 
-    # Sort schedule for consistency
-    user.schedule.sort(key=lambda s: s.start_date)
+                # In-person constraints
+                if r.inperson_courses and course.name in r.inperson_courses:
+                    # Check end date limit
+                    if r.in_person_end_dt and ses.start_date > r.in_person_end_dt:
+                        continue
+                    # Check max in-person sessions
+                    if r.max_inperson and inperson_count >= r.max_inperson:
+                        continue
+                    # Passed checks; mark session as in-person
+                    ses.inperson = True
+                    inperson_count += 1
 
-    print(f"Set courses scheduled for {user.id_}.")
+                # Assign course to session
+                ses.add_course(course)
+                assigned = True
+                break
+
+            if not assigned:
+                raise SchedulingError(f"Cannot schedule course '{course.name}' under current restraints.")
+
+        # Move assigned sessions to schedule
+        for ses in user.free_sessions:
+            if ses.courses:
+                user.schedule.append(ses)
+
+        # Remove filled sessions from free_sessions
+        user.free_sessions = [s for s in user.free_sessions if not s.courses]
+
+        # Update assigned courses list
+        user.assigned_courses.extend(remaining_courses)
+
+        print(f"Scheduling complete for {user.id_}.")

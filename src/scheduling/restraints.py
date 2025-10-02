@@ -1,8 +1,6 @@
-from dataclasses import dataclass, field
 from typing import Optional
 import datetime as dt
 
-@dataclass
 class Restraints:
     """
     Defines scheduling constraints for course planning.
@@ -17,12 +15,22 @@ class Restraints:
     - ses_max_class (int, optional): Maximum number of classes per session. Default is 4.
     - exceed_benefits (bool, optional): Allows scheduling of sessions beyond GIB benefits. Default is False.
     """
-    inperson_courses: Optional[list[str]] = None
-    min_inperson: Optional[int] = None
-    max_inperson: Optional[int] = None
-    in_person_end_dt: Optional[dt.date] = None
-    ses_max_cost: Optional[int | float] = None
-    ses_min_class: int = 2
-    ses_max_class: int = 4
-    exceed_benefits: bool = False
- 
+    def __init__(
+        self,
+        inperson_courses: Optional[list[str]] = None,
+        min_inperson: Optional[int] = None,
+        max_inperson: Optional[int] = None,
+        in_person_end_dt: Optional[dt.date] = None,
+        ses_max_cost: Optional[int | float] = None,
+        ses_min_class: int = 2,
+        ses_max_class: int = 4,
+        exceed_benefits: bool = False
+    ):
+        self.inperson_courses = inperson_courses
+        self.min_inperson = min_inperson
+        self.max_inperson = max_inperson
+        self.in_person_end_dt = in_person_end_dt
+        self.ses_max_cost = ses_max_cost
+        self.ses_min_class = ses_min_class
+        self.ses_max_class = ses_max_class
+        self.exceed_benefits = exceed_benefits

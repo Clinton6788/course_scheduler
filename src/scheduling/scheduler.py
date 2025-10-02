@@ -14,7 +14,6 @@ from config.settings import (
     )
 import pandas as pd
 from src.scheduling.course import Course
-from src.user.gi_bill import FinanceMGR
 
 class Scheduler:
     def __init__(self):
