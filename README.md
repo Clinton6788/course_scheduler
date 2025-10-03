@@ -5,6 +5,15 @@ This tool was developed for personal and academic use, but can be extended for d
 
 ---
 
+### Quick Notes
+
+I recommend using extension `Edit CSV` to modify the input csv via text editor, if for personal use or while testing. <br>
+While stated multiple times, this is a HARSH program with no error handling. Every error will Raise.
+
+
+---
+---
+
 ## Summary
 
 This program allows users to create a course schedule while accounting for:
@@ -13,7 +22,7 @@ This program allows users to create a course schedule while accounting for:
 - Grants and benefit use
 - User-defined restraints
 - Course prerequisites
-- Intent to transfer or challenge courses
+- Intent to transfer or challenge coursess
 
 ---
 
