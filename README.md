@@ -1,115 +1,182 @@
-# Course Scheduler 
+# 🎓 Course Scheduler
 
-Welcome to the course scheduler. While this was designed for personal use, it can easily be modified for database use (some methods and functions assume future db use), or just used right out of the box. 
+Welcome to the **Course Scheduler**!  
+This tool was developed for personal and academic use, but can be extended for database integration or used directly out of the box.
+
+---
 
 ## Summary
-**This program allows users to create a course schedule, factoring in: GI Bill, grants, user defined restraints, and course prerequisites.**   
 
+This program allows users to create a course schedule while accounting for:
 
-### Jump To
+- GI Bill eligibility
+- Grants and benefit use
+- User-defined restraints
+- Course prerequisites
+- Intent to transfer or challenge courses
+
+---
+
+## Jump To
+
+- [Getting Started](#getting-started)
+  - [Course Input CSV Format](#-course-input-csv-format)
+  - [Notes & Validation Rules](#notes--validation-rules)
+  - [Example CSV Row](#example-csv-row)
+  - [Non-Developer Type-Hints](#non-developer-type-hints)
+  - [Program Use](#program-use)
 - [Developer](#developer)
+  - [Caution](#caution)
+  - [Access and Objects](#access-and-objects)
+  - [Program Flow](#flow)
 
 ---
+
+##  Getting Started
+
+> **Non-developers:** Stick to editing `main.py` and `config/settings.py`. Everything else assumes some programming familiarity.
+
 ---
 
-## Getting Started
+### Course Input CSV Format
 
-> **NOTE:** If you are NOT an experienced developer, stay on pages: `main.py` and `config > settings.py`!
+Course data must be provided via a **CSV file**, with the **exact columns** listed below. Each column must follow the specified format and allowed values.
+
+#### Required Columns
+
+| Column Name         | Type     | Description |
+|---------------------|----------|-------------|
+| `Course ID`         | `str`    | Unique identifier or name of the course. Example: `ENG101` |
+| `Credit Hours`      | `int`    | Number of credit hours (e.g. `3`) |
+| `Status`            | `int`    | Course status: `0` = Not started, `1` = In Progress, `2` = Completed |
+| `Level`             | `int`    | Course level: `0` = Undergraduate, `1` = Graduate |
+| `PreReqs`           | `str`    | Prerequisite logic string using pipe (`|`) separators. Items in brackets `[]` are treated as OR conditions. Items outside are treated as AND. <br><br>ℹ️ *Example format is shown in `course_input.csv` (example file included).* |
+| `Capstone`          | `bool`   | Capstone course? `0` = No, `1` = Yes. Capstones must be scheduled last. |
+| `Session`           | `int`    | Manually assigned session number. Required for `In Progress` or `Completed` courses. Leave blank for `Transfer` or `Challenge` intents or courses that should be auto-scheduled. |
+| `Transfer Intent`   | `int`    | Will this be completed via **external transfer**? `0` = No, `1` = Yes |
+| `Challenge Intent`  | `int`    | Will this be completed via **school-provided challenge test**? `0` = No, `1` = Yes |
+
+---
+
+### Notes & Validation Rules
+
+- All columns are **required**. Use `0` or leave blank where not applicable.
+- `PreReqs` must refer to valid `Course ID`s in the file (or already completed).
+- `Session` must be set if `Status` is `1` or `2`.
+- If `Transfer Intent` or `Challenge Intent` is `1`, **leave `Session` blank**.
+- Capstone courses (`Capstone = 1`) are scheduled **last**, after all prerequisites.
+
+---
+
+### Example CSV Row
+
+```
+ENG101,3,2,0,,0,1,0,0
+```
+
+| Field              | Value | Explanation |
+|--------------------|--------|-------------|
+| Course ID          | `ENG101` | Course name |
+| Credit Hours       | `3`      | 3 credit hours |
+| Status             | `2`      | Completed |
+| Level              | `0`      | Undergraduate |
+| PreReqs            | *(blank)* | No prerequisites |
+| Capstone           | `0`      | Not a capstone |
+| Session            | `1`      | Completed in session 1 |
+| Transfer Intent    | `0`      | Not a transfer |
+| Challenge Intent   | `0`      | Not a challenge |
+
+---
+
+### Save Format
+
+Save your file with a `.csv` extension (e.g. `courses.csv`).  
+Use a plain text editor, Excel, or any spreadsheet tool that preserves raw CSV formatting.
 
 ---
 
 ### Non-Developer Type-Hints
-> For school's benefit.
 
-On `main.py` and `settings.py`, you will see type-hints for all user fields.  
+In `main.py` and `settings.py`, you’ll see **type hints** beside input fields. These tell you what kind of value to provide:
 
-These show what type of input each field expects:
-
-- `int`: Whole number (e.g. `5`, `-1`)
-- `float`: Number with decimals (e.g. `3.75`, `0.0`)
-- `str`: Text or characters (e.g. `"Math101"`)
-- `list`: Group of items in brackets (e.g. `[1, 2, 3]`, `["A", "B"]`)
-- `tuple`: Fixed-size group in parentheses (e.g. `(int, int)` = `(5, 10)`)
+- `int`: Whole number (e.g. `3`, `0`)
+- `float`: Decimal (e.g. `3.75`)
+- `str`: Text or characters (e.g. `"ENG101"`)
+- `list`: List of values in square brackets (e.g. `[1, 2, 3]`)
+- `tuple`: Fixed-length set in parentheses (e.g. `(5, 10)`)
 
 ---
 
 ### Program Use
-This program comes with two .csv files for example usage: `course_input_masters.csv` (bachelors and masters courses) and `course_input.csv` (bachelors only). If you want to see how the program works, **keep these in place**. The program is ready to demo out of the box, assuming all dependencies are present. 
 
-1. Install all dependencies. If not comfortable with this, you should not be using this program; it is not a 'refined' program.
+The repo includes example files to test immediately:
 
-2. Either modify `course_input_masters.csv` or `course_input.csv`, or create and save your own course input csv file. I recommend saving to the local directory, then using a relative path (as shown with the example files). 
+- `course_input.csv`: Undergraduate only
+- `course_input_masters.csv`: Undergraduate and graduate
 
-3. Fill out all settings and user inputs on `main.py` and `settings.py`.
+To run:
 
-4. Run `main.py`. Everything is setup to take you from input to refined schedule already. Will save schedule in directory as `course_schedule.csv`
+1. Install all Python dependencies.
+2. Modify one of the example CSVs or create your own.
+3. Set your configuration in `main.py` and `config/settings.py`.
+4. Run `main.py`.
+
+Output is saved as `course_schedule.csv` in the working directory.
 
 ---
 ---
 
 ## Developer
-For any developer looking to modify and/or improve functionality, this will outline general flow, access points and cautionary areas. Please note that this was developed for personal use and as a school project, so it has not undergone massive refinement and refactoring. It was designed to be fairly modular and easy to adapt to each user/school's situation, as well as easy to integrate with a database (for school use). While it was intended to stay as loosely coupled as possible, the nature of the project resulted in a tighter coupling than I would have liked. 
 
----
+This section is for developers interested in modifying or extending the scheduler.
 
 ### Caution
-It is (generally) an unpolished program, with easy access to settings capable of breaking the function, as well as a very harsh enforcement/validation. Be careful when changing settings. If not comfortable with programming, stick to modifying user inputs on `main.py` and `settings.py` only. 
 
-> **IMPORTANT:** Validation is generally simple `type` enforcement. PROGRAM IS NOT DESIGNED TO HAVE UNTRUSTED INPUT. If using with a database and/or User Input, ensure proper validation of all inputs.
+This is a functional but unpolished tool. The system:
+
+- Allows **easy access to critical settings**
+- Has **minimal safety validation**
+- Assumes **trusted input only**
+
+If integrating with user input or a database, add your own validation layer.
 
 ---
 
 ### Access and Objects
 
-#### Access
+#### Primary Access Point
 
-Primary access is currently through `src.services`. While this is redundant in some cases, it limited clutter and allowed for easy to interpret instructions on `main.py`, for the purposes of the school project. 
+All business logic is routed through `src/services`, designed to reduce clutter in `main.py`.
 
-#### Objects
+#### Key Objects
 
-Listed below are the primary objects and their function.
-
-- User
-    - Holds user information, courses, sessions, GI BIll, and user's schedule.
-- Restraints
-    - Holds user-defined restraints for scheduling. At present, this is not stored with user, but updated/created each new schedule.
-- Course
-    - Holds course information, calculates self cost upon init
-- Session
-    - Holds completed and/or scheduled courses, intent (used to define a course user intends on completing either through a transfer credit or 'opt-out' type challenge test) courses. Calculates self cost upon init.
-- GIB
-    - User's GI BIll. Holds all user GIB data. Calculates benefit charges based on sessions. 
+- **`User`**: Holds user data, GI Bill, course list, and schedule.
+- **`Restraints`**: Holds constraints like course load per session, max credit hours, etc.
+- **`Course`**: Represents a course and calculates its cost.
+- **`Session`**: Represents a semester/session, holds courses and calculates cost.
+- **`GIB`**: GI Bill handler, calculates benefit usage and charges.
 
 ---
 
 ### Flow
 
-The general program flow is as follows:
+1. **Intake**
+   - Read and validate CSV input
+   - Create `Course` objects
+   - Prioritize based on capstone, number of prerequisites, etc.
 
-- Intake
-    - Collect course input (csv)
-    - Clean/validate input
-    - Create Course objects
-    - Prioritize and sort object
-        - Prioritization based on inperson, capstone, and number of prereqs. Used for scheduling later
-    - Return prioritized Courses
+2. **Creation**
+   - Create new `User`
+   - Create new `GIB` (if needed)
 
-- Creation
-    - New GI Bill created (if necessary)
-    - New User created (with courses from intake)
+3. **Scheduling**
+   - Create `Restraints` object
+   - Schedule fixed (manually set) courses first
+   - Treat transfer/challenge courses as "completed"
+   - Schedule remaining courses within constraints
+   - Raise `SchedulingError` if scheduling fails
 
-- Scheduling
-    - New Restraints obj created
-    - All sessions created
-    - 'Set' (user defined session number) courses scheduled
-    - 'Intent' courses assumed completed for prereq purposes
-    - 'Free' courses attempt to be scheduled while respecting restraints
-        - Raises `SchedulingError()` if outside restraints or scheduling fails
-    - Successful Session objects stored in `user.schedule` as list
-        - At present, `session.num` acts as session ID.
+4. **Export**
+   - Output schedule as `course_schedule.csv`
 
-- Export
-    - User's schedule is listed in csv and saved in dir as `course_schedule.csv`
-
----
 ---
