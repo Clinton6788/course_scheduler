@@ -1,65 +1,115 @@
-# Class Scheduler 
+# Course Scheduler 
 
-Welcome to the class scheduler. While this was designed for personal use, it can easily be modified, or even used right out of the box. 
+Welcome to the course scheduler. While this was designed for personal use, it can easily be modified for database use (some methods and functions assume future db use), or just used right out of the box. 
 
 ## Summary
-**This program allows users to create a course schedule, factoring in: GI Bill, user defined restraints, prerequisites and user defined priorities.**   
+**This program allows users to create a course schedule, factoring in: GI Bill, grants, user defined restraints, and course prerequisites.**   
 
----
 
-### A Note of Caution
-It is (generally) an unpolished program, with easy access to settings capable of breaking the function, as well as a very harsh enforcement/validation. Be careful when changing settings, and operate through the CLI unless comfortable. It was designed to be fairly modular and easy to adapt to each user/school's situation, as well as easy to integrate with a database (for school use). Most classes are coupled loosely, if at all. 
-
-> **IMPORTANT:** Validation is generally simple `type` enforcement. PROGRAM IS NOT DESIGNED TO HAVE UNTRUSTED INPUT. If using with a database and/or FE, ensure proper validation of all inputs.
+### Jump To
+- [Developer](#developer)
 
 ---
 ---
 
-## User Stories
-**As a user, I want to be able to...**
-- Import classes from .csv or add classes manually
-    - Stores in SQLite
-- Import in-person classes from .csv or add in-person classes manually
-    - Stores in SQLite
-    - Have a unique list that changes every semester/session
-        - Based on Location
-- View all currently completed classes
-- View all currently enrolled classes
-- View by session
-- Enter GI Bill benefits start, end dates and Total Coverage Amount
-- Have the GI Bill benefits update based on what's completed, when it was completed and remaining benefits
-- Have the ability to mark classes as 'Transfer Credit'
-    - Does not mean completed, only intent to complete in Sophia
-    - This removes course from session and cost projections
-    - Fits into session that allows for pre-req satisfaction
-- See an estimated course schedule that accounts for:
-    - Transfers (Not included in enrollment, but IS included in pre-req and completion date)
-    - Pre-reqs
-    - Remaining GI Bill benefits
-    - In-person (Where applicable)
-- Be able to move courses to adjust schedule
-    - Auto adjusts costs, pre-reqs, remaining schedule, etc.
-- Download .csv with tentative schedule and course details
+## Getting Started
 
-## Flow
-### Intake/Org
-- `get_excel()`
-    - Data imported and cleand from CSV/EXCEL; converted to dataframe
-- `df` returned
-- `create_courses(df)`
-    - Course objects created from rows
-- `all_courses` LIST returned
-- `organize_courses(all_courses)`
-    - Seperates into 'Level' (grad, undergrad)
-    - Returned data structure `{LevelENUM.value: {Course.course_id: Course,...},...}`
-- `course_level_dict` returned
-- `for k,v in course_level_dict:`
-    - Iter through to get individual level dicts
-    - `prioritize_courses(v)`
-        - Assigns and orders by course priority
-        - `ordered_courses` LIST returned
-    - `filter_courses(ordered_courses)`
-        - filters based on CourseFilterEnum
-        - Returns: `{CourseFilterENUM.value: [Course,...],...}`
-    - `filtered_course_dict` returned
-    - `course_level_dict[k] = filtered_course_dict`
+> **NOTE:** If you are NOT an experienced developer, stay on pages: `main.py` and `config > settings.py`!
+
+---
+
+### Non-Developer Type-Hints
+> For school's benefit.
+
+On `main.py` and `settings.py`, you will see type-hints for all user fields.  
+
+These show what type of input each field expects:
+
+- `int`: Whole number (e.g. `5`, `-1`)
+- `float`: Number with decimals (e.g. `3.75`, `0.0`)
+- `str`: Text or characters (e.g. `"Math101"`)
+- `list`: Group of items in brackets (e.g. `[1, 2, 3]`, `["A", "B"]`)
+- `tuple`: Fixed-size group in parentheses (e.g. `(int, int)` = `(5, 10)`)
+
+---
+
+### Program Use
+This program comes with two .csv files for example usage: `course_input_masters.csv` (bachelors and masters courses) and `course_input.csv` (bachelors only). If you want to see how the program works, **keep these in place**. The program is ready to demo out of the box, assuming all dependencies are present. 
+
+1. Install all dependencies. If not comfortable with this, you should not be using this program; it is not a 'refined' program.
+
+2. Either modify `course_input_masters.csv` or `course_input.csv`, or create and save your own course input csv file. I recommend saving to the local directory, then using a relative path (as shown with the example files). 
+
+3. Fill out all settings and user inputs on `main.py` and `settings.py`.
+
+4. Run `main.py`. Everything is setup to take you from input to refined schedule already. Will save schedule in directory as `course_schedule.csv`
+
+---
+---
+
+## Developer
+For any developer looking to modify and/or improve functionality, this will outline general flow, access points and cautionary areas. Please note that this was developed for personal use and as a school project, so it has not undergone massive refinement and refactoring. It was designed to be fairly modular and easy to adapt to each user/school's situation, as well as easy to integrate with a database (for school use). While it was intended to stay as loosely coupled as possible, the nature of the project resulted in a tighter coupling than I would have liked. 
+
+---
+
+### Caution
+It is (generally) an unpolished program, with easy access to settings capable of breaking the function, as well as a very harsh enforcement/validation. Be careful when changing settings. If not comfortable with programming, stick to modifying user inputs on `main.py` and `settings.py` only. 
+
+> **IMPORTANT:** Validation is generally simple `type` enforcement. PROGRAM IS NOT DESIGNED TO HAVE UNTRUSTED INPUT. If using with a database and/or User Input, ensure proper validation of all inputs.
+
+---
+
+### Access and Objects
+
+#### Access
+
+Primary access is currently through `src.services`. While this is redundant in some cases, it limited clutter and allowed for easy to interpret instructions on `main.py`, for the purposes of the school project. 
+
+#### Objects
+
+Listed below are the primary objects and their function.
+
+- User
+    - Holds user information, courses, sessions, GI BIll, and user's schedule.
+- Restraints
+    - Holds user-defined restraints for scheduling. At present, this is not stored with user, but updated/created each new schedule.
+- Course
+    - Holds course information, calculates self cost upon init
+- Session
+    - Holds completed and/or scheduled courses, intent (used to define a course user intends on completing either through a transfer credit or 'opt-out' type challenge test) courses. Calculates self cost upon init.
+- GIB
+    - User's GI BIll. Holds all user GIB data. Calculates benefit charges based on sessions. 
+
+---
+
+### Flow
+
+The general program flow is as follows:
+
+- Intake
+    - Collect course input (csv)
+    - Clean/validate input
+    - Create Course objects
+    - Prioritize and sort object
+        - Prioritization based on inperson, capstone, and number of prereqs. Used for scheduling later
+    - Return prioritized Courses
+
+- Creation
+    - New GI Bill created (if necessary)
+    - New User created (with courses from intake)
+
+- Scheduling
+    - New Restraints obj created
+    - All sessions created
+    - 'Set' (user defined session number) courses scheduled
+    - 'Intent' courses assumed completed for prereq purposes
+    - 'Free' courses attempt to be scheduled while respecting restraints
+        - Raises `SchedulingError()` if outside restraints or scheduling fails
+    - Successful Session objects stored in `user.schedule` as list
+        - At present, `session.num` acts as session ID.
+
+- Export
+    - User's schedule is listed in csv and saved in dir as `course_schedule.csv`
+
+---
+---

@@ -369,14 +369,14 @@ class Scheduler:
                 # Ensure inside benefits
                 if r.exceed_benefits is False and covered is False:
                     raise SchedulingError(f"Session exceeds benefits: {s=}")
-                s.adj_cost = cost
 
             # Ensure inside max cost
             if r.ses_max_cost and cost > r.ses_max_cost:
                 raise SchedulingError(f"Session outside cost restraint: {s=}")
             
             # If gib, finalize charge
-            user.gib.charge_session(s, True)
+            _, cost = user.gib.charge_session(s, final=True)
+            s.adj_cost = cost
 
             # Assign scheduled session and courses to user
             user.schedule.append(s)

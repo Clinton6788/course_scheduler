@@ -114,6 +114,7 @@ class GIB:
 
         Args:
             session (Session): The session to charge.
+            was_covered (bool): If True, attempt to cover with GI Bill.
             final (bool): If True, apply the deduction permanently.
 
         Returns:
@@ -122,37 +123,37 @@ class GIB:
         ses_date = session.start_date
         ses_cost = session.adj_cost
 
-        # Return if no benefits
         if not was_covered:
             return ses_cost
 
-        # Determine the benefit year start
+        # Determine the benefit year for this session
         year_start = dt.date(ses_date.year, self.benefit_start.month, self.benefit_start.day)
         if ses_date < year_start:
             year_start = year_start.replace(year=year_start.year - 1)
 
         year_end = year_start + relativedelta(years=1) - dt.timedelta(days=1)
 
-        # Work on a copy to avoid mutating original unless final
-        benefit_years_copy = {
+        # Use working copy if not final
+        target_years = self.benefit_years if final else {
             k: BenefitYear(v.st, v.end, v.amount) for k, v in self.benefit_years.items()
         }
 
         # Initialize year if missing
-        if year_start not in benefit_years_copy:
-            benefit_years_copy[year_start] = BenefitYear(year_start, year_end, self.yearly_amount)
+        if year_start not in target_years:
+            target_years[year_start] = BenefitYear(year_start, year_end, self.yearly_amount)
 
         # Apply coverage
-        year = benefit_years_copy[year_start]
-        available = year.amount
-        coverage = min(ses_cost, available)
+        year = target_years[year_start]
+        coverage = min(ses_cost, year.amount)
         year.amount -= coverage
-        user_owes = ses_cost - coverage  # Always >= 0
+        user_owes = ses_cost - coverage
 
-        if final:
-            self.benefit_years = benefit_years_copy
-
-        return user_owes
+        # Apply updated copy if final
+        if final is False:
+            return user_owes
+        else:
+            self.benefit_years = target_years
+            return user_owes
 
 
 

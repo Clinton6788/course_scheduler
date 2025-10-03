@@ -1,39 +1,28 @@
-
 def get_courses_pipeline(
         course_path: str,
         course_path_abs: bool,
         in_person: list|None|str = None,
-
-        ) -> dict:
+        ) -> list:
     """
     Process raw course data through the full pipeline:  
     1. Load from Excel  
     2. Create Course objects  
     3. Organize by level  
     4. Prioritize courses  
-    5. Filter into categories (FilterENUM)  
 
     Args:
         in_person (list): Optional list of course IDs to treat as in-person for filtering logic.
 
     Returns:
-        dict: Nested structure of courses by level and filter category:
-            {
-                LevelENUM: {
-                    FilterENUM: [Course, Course, ...],
-                    ...
-                },
-                ...
-            }
+        courses: List of Course objects
     """
     # Imports to avoid high-level exposure
-    from src.services.intake.org import (
+    from src.intake import (
+        fetch_data,
         create_courses,
         organize_courses,
-        prioritize_courses,
+        prioritize_courses
     )
-    from src.services.intake.intake import fetch_data
-
     # Quick Validation:
     msg = "Get Courses Pipeline||Improper Arg: "
     assert isinstance(course_path, str), f"{msg} course_path: {type(course_path)}"
@@ -62,16 +51,7 @@ def get_courses_pipeline(
         k: prioritize_courses(v,in_person=in_person)
         for k, v in org_by_level_dict.items()
     }
-    # {LevelENUM: [Course, Course, ...], ...}
 
-    # Filter courses per level into FilterENUM categories
-    # final_dict = {
-    #     k: filter_courses(v)
-    #     for k, v in prioritized_dict.items()
-    # }
-    # -> {LevelENUM: {FilterENUM: [Courses], ...}, ...}
-
-    # Flatten all courses
     out = []
     for _, l in prioritized_dict.items():
         out.extend(l)

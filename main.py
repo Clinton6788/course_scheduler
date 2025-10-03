@@ -4,7 +4,7 @@ import datetime as dt
 If modifying for DB usage, match naming conventions here.
 """
 
-"""------------------------Start User Input -------------------------"""
+"""------------------------------ Start User Input ---------------------------------"""
 
 """---------User-----------"""
 # User ID (Any | None). Pass `None` for generated shortuuid
@@ -99,7 +99,10 @@ EXCEED_BENEFITS = True
 # How many sessions to spread the course-load between. Optional. (int | None)
 SPREAD_BETWEEN = 15
 
-"""------------------------- END User Input --------------"""
+
+"""--------------------------------- END User Input -----------------------------------------"""
+
+
 # Create GIB
 if not YEARLY_GIB_AMOUNT:
     gib = None
