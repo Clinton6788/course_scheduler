@@ -27,7 +27,7 @@ def generate_schedule(
         restraints = generate_restraints(**kwargs)
 
     # Create sessions
-    Sch.create_all_sessions(user, restraints)
+    Sch.create_all_sessions(user, restraints, spread_between)
 
     print(f"User Sessions: {user.schedule}|||{user.free_sessions}")
 
@@ -96,7 +96,7 @@ def export_schedule(
             intent_ids = ', '.join(course.course_id for course in session.intent)
             start_date = session.start_date.isoformat() if hasattr(session.start_date, 'isoformat') else session.start_date
             total_ch = session.tot_ch
-            total_cost = session.tot_cost
-            user_cost = session.adj_cost
+            total_cost = round(session.tot_cost)
+            user_cost = round(session.adj_cost)
 
             writer.writerow([session_num, start_date, course_ids, intent_ids, total_ch, total_cost, user_cost])

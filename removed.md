@@ -468,3 +468,63 @@ class Scheduler:
         return total_cost / total_ch        
 
 ```
+
+### Scheduler method that was redundant
+
+```python
+    @classmethod
+    def _plan_session_levels(
+        cls,
+        user: User, 
+        restraints: Restraints, 
+        spread_between: Optional[int] = None
+        ) -> None:
+        """
+        Assigns level to sessions in user.free_sessions after session creation AND set courses scheduled.
+
+        Args:
+            user (User): User instance with free_sessions created.
+            restraints (Restraints): Scheduling constraints.
+            spread_between (int, optional): If provided, will spread across a fixed number of sessions.
+        """
+        r = restraints
+        under_count = sum(1 for c in user.courses if c.level == LevelENUM.UNDERGRAD and not c.session)
+        grad_count = sum(1 for c in user.courses if c.level == LevelENUM.GRADUATE and not c.session)
+        total_courses = under_count + grad_count
+
+        if total_courses == 0:
+            return  # No levels to assign
+
+        # Determine session count
+        if spread_between and spread_between > 0:
+            total_sessions = spread_between
+        else:
+            under_ses = (under_count + r.ses_min_class - 1) // r.ses_max_class
+            grad_ses = (grad_count + r.ses_min_class - 1) // r.ses_max_class
+            total_sessions = under_ses + grad_ses
+
+        # Limit by GI Bill
+        if hasattr(user, "gib") and user.gib and not r.exceed_benefits:
+            session_days = SESSION_WEEKS * 7
+            max_sessions = user.gib.get_remaining_days() // session_days
+            total_sessions = min(total_sessions, max_sessions)
+
+        # Get actual sessions to plan
+        sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
+        if total_sessions < len(sessions):
+            sessions = sessions[:total_sessions]
+
+        # Compute session counts by level
+        under_ratio = under_count / total_courses if total_courses else 0
+        grad_ratio = grad_count / total_courses if total_courses else 0
+
+        under_ses = round(total_sessions * under_ratio)
+        grad_ses = total_sessions - under_ses
+
+        # Assign levels to sessions
+        print("_____________PLAN SESSION LEVELS_____________")
+        for i, s in enumerate(sessions):
+            s.level = LevelENUM.UNDERGRAD if i < under_ses else LevelENUM.GRADUATE
+            print(f"\n {s.num}: {s.level}")
+
+```

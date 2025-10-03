@@ -56,8 +56,8 @@ class GIB:
         for s in sessions:
             if s in self.charged_sessions:
                 continue
-            self._charge_days(s, final=True)
-            self._charge_cost(s, final=True)
+            was_covered = self._charge_days(s, final=True)
+            self._charge_cost(s, was_covered, final=True)
 
     def charge_session(self, sess: Session, final: bool = False) -> tuple[bool, float]:
         """
@@ -72,8 +72,9 @@ class GIB:
             print(f"Already charged session {sess.num}")
             return
         
+        # Must charge days first to ensure cost is charged fully if no benefits
         ses_covered = self._charge_days(sess, final)
-        charge_amount = self._charge_cost(sess, final)
+        charge_amount = self._charge_cost(sess, ses_covered, final)
 
         if final:
             self.charged_sessions.append(sess.num)
@@ -107,7 +108,7 @@ class GIB:
 
         return True
     
-    def _charge_cost(self, session: Session, final: bool) -> float:
+    def _charge_cost(self, session: Session, was_covered: bool, final: bool) -> float:
         """
         Deducts the session cost from the appropriate benefit year.
 
@@ -120,6 +121,10 @@ class GIB:
         """
         ses_date = session.start_date
         ses_cost = session.adj_cost
+
+        # Return if no benefits
+        if not was_covered:
+            return ses_cost
 
         # Determine the benefit year start
         year_start = dt.date(ses_date.year, self.benefit_start.month, self.benefit_start.day)

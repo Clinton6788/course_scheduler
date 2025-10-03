@@ -15,7 +15,12 @@ class SchedulingError(Exception):
 class Scheduler:
 
     @classmethod
-    def create_all_sessions(cls, user: User, restraints: Restraints) -> None:
+    def create_all_sessions(
+        cls, 
+        user: User, 
+        restraints: Restraints, 
+        spread_between: int = None
+    ) -> None:
         """Creates all possible sessions for User instance, based on 
         len(user.courses), Restraints.ses_min_class, and available GI Bill days.
 
@@ -24,6 +29,7 @@ class Scheduler:
                 attr 'user.courses'.
             restraints (Restraints): Restraints instance with all applicable 
                 fields.
+            spread_between (int, optional): Total number of sessions to spread courses across.
         """
         from src.user import User
         print(f"Creating sessions for {user.id_}...")
@@ -33,31 +39,40 @@ class Scheduler:
         # Count courses by level
         under_count = sum(1 for c in u.courses if c.level == LevelENUM.UNDERGRAD)
         grad_count = sum(1 for c in u.courses if c.level == LevelENUM.GRADUATE)
+        total_courses = under_count + grad_count
 
-        # Calculate required sessions using max_per_ses to minimize extra sessions
-        under_ses = (under_count + r.ses_max_class - 1) // r.ses_max_class
-        grad_ses = (grad_count + r.ses_max_class - 1) // r.ses_max_class
+        # Determine session counts
+        if spread_between:
+            if total_courses == 0:
+                under_ses = grad_ses = 0
+            else:
+                # Compute proportional sessions
+                under_ses = max(int(spread_between * under_count / total_courses), 1 if under_count > 0 else 0)
+                grad_ses = max(spread_between - under_ses, 1 if grad_count > 0 else 0)
+        else:
+            # Use max_per_ses to minimize extra sessions
+            under_ses = (under_count + r.ses_max_class - 1) // r.ses_max_class
+            grad_ses = (grad_count + r.ses_max_class - 1) // r.ses_max_class
 
-        print(f"GRADSESSIONS: {grad_ses} _____ GRADCOUNT: {grad_count}")
+            # Ensure at least 1 session if any courses exist
+            under_ses = max(under_ses, 1) if under_count > 0 else 0
+            grad_ses = max(grad_ses, 1) if grad_count > 0 else 0
 
-        # Ensure at least 1 session if any courses exist
-        under_ses = max(under_ses, 1) if under_count > 0 else 0
-        grad_ses = max(grad_ses, 1) if grad_count > 0 else 0
+        print(f"Calculated sessions -> Undergrad: {under_ses}, Grad: {grad_ses}")
 
-        # Limit by GI Bill if exists and is limiting
+        # Limit by GI Bill if exists
         if hasattr(u, "gib") and u.gib:
             session_days = SESSION_WEEKS * 7
             if r.exceed_benefits is False:
                 max_sessions_possible = u.gib.get_remaining_days() // session_days
             else:
-                max_sessions_possible = under_ses + grad_ses  # --------------- Modified
+                max_sessions_possible = under_ses + grad_ses
             total_ses = under_ses + grad_ses
 
             if total_ses > max_sessions_possible:
                 if r.exceed_benefits is False:
                     raise SchedulingError(f"Schedule will exceed benefits||"
                                         f"{total_ses=}||{max_sessions_possible=}")
-                
 
                 # Reduce proportionally per level
                 if total_ses > 0:
@@ -75,7 +90,6 @@ class Scheduler:
 
         # Sort session months
         ses_months = sorted(SESSION_MONTHS)
-
         yr = u.first_ses_dt.year
         mo_index = ses_months.index(u.first_ses_dt.month)
 
@@ -109,13 +123,11 @@ class Scheduler:
         full_sessions = [s for s in full_sessions if s not in u.schedule]
         print("FULL SESSIONS")
         for s in full_sessions:
-            print(f"FULL SESSIONS_______{s.num}: {s.level}")
+            print(f"{s.num}: {s.level}")
 
         # Sort sessions by start date
         u.free_sessions = sorted(full_sessions, key=lambda s: s.start_date)
-
         print("Sessions creation complete.")
-        print(f"-----SESSIONS-----\n {u.free_sessions}")
 
     @classmethod
     def schedule_set(cls, user: User) -> None:
@@ -238,6 +250,29 @@ class Scheduler:
                 for matched_id in matched_ids:
                     s_prev.add_intent(intent_map[matched_id])
                     intent_map.pop(matched_id)            
+        
+        # Apply any leftover intents by spreading the load
+        level = 1
+        pending_ids = list(intent_map.keys())
+        i = 0
+
+        while pending_ids and i < 100:
+            for course_id in pending_ids[:]:  # iterate over a copy
+                course = intent_map[course_id]
+                for session in user.schedule:
+                    # Skip sessions that are already underway
+                    if session.start_date <= dt.date.today():
+                        continue
+                    # Spread course into this session if under current level
+                    if len(session.intent) <= level:
+                        session.add_intent(course)
+                        pending_ids.remove(course_id)
+                        break  # move to next course
+            level += 1
+            i += 1
+
+        if i >= 100:
+            raise SchedulingError("Max iterations hit with intent courses")
 
     @classmethod
     def _schedule_level(
@@ -379,102 +414,52 @@ class Scheduler:
     @classmethod
     def _get_course_targets(
         cls,
-        n_courses, 
-        n_sessions, 
-        min_per_ses, 
-        max_per_ses
+        n_courses: int,
+        n_sessions: int,
+        min_per_ses: int,
+        max_per_ses: int
     ) -> list[int]:
+        """
+        Distribute n_courses across n_sessions as evenly as possible,
+        while respecting min_per_ses and max_per_ses.
+
+        Returns a list of course counts per session.
+        """
+
         if n_courses < n_sessions * min_per_ses:
             raise ValueError("Too few courses to meet minimum per session.")
         if n_courses > n_sessions * max_per_ses:
             raise ValueError("Too many courses to stay under maximum per session.")
 
-        targets = []
-        remaining = n_courses
+        # Start with the floor division
+        base = n_courses // n_sessions
+        remainder = n_courses % n_sessions
 
-        for _ in range(n_sessions):
-            if remaining >= max_per_ses:
-                targets.append(max_per_ses)
-                remaining -= max_per_ses
-            elif remaining >= min_per_ses:
-                targets.append(remaining)
-                remaining = 0
-            else:
-                break  # can't fill another valid session
+        # Ensure base is within min/max bounds
+        if base < min_per_ses:
+            base = min_per_ses
+            remainder = n_courses - base * n_sessions
+        elif base > max_per_ses:
+            base = max_per_ses
+            remainder = n_courses - base * n_sessions
 
-        # Fix last session if it's below min_per_ses
-        for i in reversed(range(1, len(targets))):
-            if 0 < targets[i] < min_per_ses:
-                needed = min_per_ses - targets[i]
-                for j in range(i):
-                    if targets[j] > min_per_ses:
-                        take = min(needed, targets[j] - min_per_ses)
-                        targets[j] -= take
-                        targets[i] += take
-                        needed -= take
-                        if needed == 0:
-                            break
+        targets = [base] * n_sessions
 
-                if targets[i] < min_per_ses:
-                    raise ValueError("Cannot distribute courses while meeting min_per_ses constraint.")
+        # Distribute remainder one by one to first sessions that won't exceed max_per_ses
+        i = 0
+        while remainder > 0:
+            if targets[i] < max_per_ses:
+                targets[i] += 1
+                remainder -= 1
+            i = (i + 1) % n_sessions  # wrap around if needed
 
-        # Final filter: drop sessions with 0 targets
-        return [t for t in targets if t >= min_per_ses]
+        # Final sanity check
+        for t in targets:
+            if not (min_per_ses <= t <= max_per_ses):
+                raise ValueError("Cannot distribute courses within min/max bounds.")
+
+        return targets
         
-    # @classmethod
-    # def _plan_session_levels(
-    #     cls,
-    #     user: User, 
-    #     restraints: Restraints, 
-    #     spread_between: Optional[int] = None
-    #     ) -> None:
-    #     """
-    #     Assigns level to sessions in user.free_sessions after session creation AND set courses scheduled.
-
-    #     Args:
-    #         user (User): User instance with free_sessions created.
-    #         restraints (Restraints): Scheduling constraints.
-    #         spread_between (int, optional): If provided, will spread across a fixed number of sessions.
-    #     """
-    #     r = restraints
-    #     under_count = sum(1 for c in user.courses if c.level == LevelENUM.UNDERGRAD and not c.session)
-    #     grad_count = sum(1 for c in user.courses if c.level == LevelENUM.GRADUATE and not c.session)
-    #     total_courses = under_count + grad_count
-
-    #     if total_courses == 0:
-    #         return  # No levels to assign
-
-    #     # Determine session count
-    #     if spread_between and spread_between > 0:
-    #         total_sessions = spread_between
-    #     else:
-    #         under_ses = (under_count + r.ses_min_class - 1) // r.ses_max_class
-    #         grad_ses = (grad_count + r.ses_min_class - 1) // r.ses_max_class
-    #         total_sessions = under_ses + grad_ses
-
-    #     # Limit by GI Bill
-    #     if hasattr(user, "gib") and user.gib and not r.exceed_benefits:
-    #         session_days = SESSION_WEEKS * 7
-    #         max_sessions = user.gib.get_remaining_days() // session_days
-    #         total_sessions = min(total_sessions, max_sessions)
-
-    #     # Get actual sessions to plan
-    #     sessions = [s for s in user.free_sessions if s.start_date >= dt.date.today()]
-    #     if total_sessions < len(sessions):
-    #         sessions = sessions[:total_sessions]
-
-    #     # Compute session counts by level
-    #     under_ratio = under_count / total_courses if total_courses else 0
-    #     grad_ratio = grad_count / total_courses if total_courses else 0
-
-    #     under_ses = round(total_sessions * under_ratio)
-    #     grad_ses = total_sessions - under_ses
-
-    #     # Assign levels to sessions
-    #     print("_____________PLAN SESSION LEVELS_____________")
-    #     for i, s in enumerate(sessions):
-    #         s.level = LevelENUM.UNDERGRAD if i < under_ses else LevelENUM.GRADUATE
-    #         print(f"\n {s.num}: {s.level}")
 
     @classmethod
     def _extract_matching_prereqs(cls, prereqs: list, intent_ids):

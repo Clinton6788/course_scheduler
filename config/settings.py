@@ -1,4 +1,3 @@
-from datetime import date
 
 """------------Sorting-----------"""
 IN_PERSON_PRIORITY = 5          # Base amount to raise priority of in person classes
@@ -18,7 +17,9 @@ ALUMNI_SAVINGS_PERCENT = 20     # Whole percentage; Ex: '20' for 20%.... NOT 0.2
 and rounded to nearest SESSION_START_DAY.
 
 It is possible for this to be slightly off from actual schedule, resulting in slightly
-mis-calculated GIB benefit usage. This is known, understood and disregarded.
+mis-calculated GIB benefit usage. This is known, understood and disregarded. Assuming
+all sessions attempt to start on the first of the month, and start on nearest 
+SESSIONS_START_DAY, any difference will be extremely minimal.
 
 Current, hard-coded max deviation is +- 1 week from target start date. If holidays prevent
 this from happening, holidays will be ignored and closest date will be applied.
@@ -34,7 +35,7 @@ SESSION_MONTHS = [
     11,
 ]
 
-SESSION_WEEKS = 8              # Length of sessions (as weeks); int only
+SESSION_WEEKS = 8               # Length of sessions (as weeks); int only
 SESSION_START_DAY = 6           # INT representation of weekday. Monday = 0
 
 # List of holidays to be ignored (If start date falls on holiday weekend)

@@ -68,6 +68,11 @@ class Session:
 
     def _calc_courses(self):
         self._tot_cost = COST_PER_SESSION
+        self._tot_ch = 0
+        self._tot_cost = 0
+        self._tot_courses = 0
+        self._pre_reqs = []
+        
         for c in self._courses:
             # Validate level
             assert self.level == c.level, f"Session||Level Difference||{self.level=}||{c.level=}"

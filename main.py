@@ -97,7 +97,7 @@ SES_MAX_COURSE = 4
 EXCEED_BENEFITS = True
 
 # How many sessions to spread the course-load between. Optional. (int | None)
-SPREAD_BETWEEN = None
+SPREAD_BETWEEN = 15
 
 """------------------------- END User Input --------------"""
 # Create GIB
