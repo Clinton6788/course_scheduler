@@ -318,7 +318,6 @@ class Scheduler:
                 
         # Schedule
         for i, s in enumerate(sessions):
-            ses_courses = []
             # Ensure inside min, max
             course_tgt = tgt_list[i]
             assert r.ses_min_class <= course_tgt <= r.ses_max_class, (
@@ -335,6 +334,10 @@ class Scheduler:
                     raise SchedulingError("In person end date required for inperson scheduling")
                 if s.start_date <= r.in_person_end_dt:
                     inperson = [c for c in qual if c in r.inperson_courses]
+                    # Append to inperson if course already in session
+                    for c in s.courses:
+                        if c in r.inperson_courses:
+                            inperson.append(c)
                     if r.min_inperson:
                         if len(inperson) < r.min_inperson:
                             raise SchedulingError("Not enough inperson courses")
@@ -342,30 +345,27 @@ class Scheduler:
                             raise SchedulingError("Restraints: Min inperson > Max class")
                         for _ in range(r.min_inperson):
                             c = inperson.pop(0)
-                            ses_courses.append(c)
+                            if c not in s.courses:
+                                s.add_course(c)
                             qual.remove(c)
 
             # Create course list after inperson satisfied
-            while len(ses_courses) < course_tgt:
+            while len(s.courses) < course_tgt:
                 print(f"Qualified for {s}: {[c.course_id for c in qual]}")
                 if len(qual) < 1:
-                    print(ses_courses, qual, course_tgt)
+                    print(s.courses, qual, course_tgt)
                     raise SchedulingError(f"Out of pre-req qualified courses||{s}")
                 c = qual.pop(0)
-                ses_courses.append(c)
+                if c not in s.courses:
+                    s.add_course(c)
 
             # Last Verify
-            assert len(ses_courses) == course_tgt
-
-            # Store inside session
-            for c in ses_courses:
-                s.add_course(c)
+            assert len(s.courses) == course_tgt
                 
             # Apply benefits
-            cost = s.tot_cost
-            s.adj_cost = cost - user.grants if cost > user.grants else 0
+            s.add_grants(user.grants)
             if gib:
-                covered, cost = user.gib.charge_session(s)
+                covered, cost = user.gib.charge_session(s, final=True)
                 # Ensure inside benefits
                 if r.exceed_benefits is False and covered is False:
                     raise SchedulingError(f"Session exceeds benefits: {s=}")
@@ -374,18 +374,15 @@ class Scheduler:
             if r.ses_max_cost and cost > r.ses_max_cost:
                 raise SchedulingError(f"Session outside cost restraint: {s=}")
             
-            # If gib, finalize charge
-            _, cost = user.gib.charge_session(s, final=True)
-            s.adj_cost = cost
-
             # Assign scheduled session and courses to user
             user.schedule.append(s)
-            user.assigned_courses.extend(ses_courses)
+            user.assigned_courses.extend(s.courses)
 
             # Remove scheduled courses and sessions
             # sessions.remove(s) # Causing skipping....Dumbass
-            for c in ses_courses:
-                courses.remove(c)
+            for c in s.courses:
+                if c in courses:
+                    courses.remove(c)
 
     @classmethod
     def _get_satisfied_prereqs(

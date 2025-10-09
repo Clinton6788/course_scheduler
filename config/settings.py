@@ -8,7 +8,14 @@ COST_PER_SESSION = 40
 COST_PER_COURSE = 100           # Additional costs only (outside of cost/ch)
 COST_PER_CH_UNDERGRAD = 514
 COST_PER_CH_GRAD = 776
-ALUMNI_SAVINGS_PERCENT = 20     # Whole percentage; Ex: '20' for 20%.... NOT 0.2.... **ONLY APPLIES TO GRAD LEVEL**
+
+# Whole percentage; Ex: '20' for 20%.... NOT 0.2.... # **ONLY APPLIES TO GRAD LEVEL**
+ALUMNI_SAVINGS_PERCENT = 20     
+APPLY_ALUMNI_SAVINGS = True             # Bool trigger to apply to grad courses
+# IF DEV:
+# APPLY belongs in restraints, not settings. 
+# I'm just too lazy to move it at this point.
+# Only utilized in 'Course' obj's __post_init__
 
 
 """----------Sessions ------------"""

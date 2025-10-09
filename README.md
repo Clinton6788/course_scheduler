@@ -59,7 +59,7 @@ Course data must be provided via a **CSV file**, with the **exact columns** list
 | `Credit Hours`      | `int`    | Number of credit hours (e.g. `3`) |
 | `Status`            | `int`    | Course status: `0` = Not started, `1` = In Progress, `2` = Completed |
 | `Level`             | `int`    | Course level: `0` = Undergraduate, `1` = Graduate |
-| `PreReqs`           | `str`    | Prerequisite logic string using pipe (`|`) separators. Items in brackets `[]` are treated as OR conditions. Items outside are treated as AND. <br><br>ℹ️ *Example format is shown in `course_input.csv` (example file included).* |
+| `PreReqs`           | `str`    | Prerequisite logic string using pipe separators. Items in brackets `[]` are treated as OR conditions. Items outside are treated as AND. <br><br>ℹ️ *Example format is shown in `course_input.csv` (example file included).* |
 | `Capstone`          | `bool`   | Capstone course? `0` = No, `1` = Yes. Capstones must be scheduled last. |
 | `Session`           | `int`    | Manually assigned session number. Required for `In Progress` or `Completed` courses. Leave blank for `Transfer` or `Challenge` intents or courses that should be auto-scheduled. |
 | `Transfer Intent`   | `int`    | Will this be completed via **external transfer**? `0` = No, `1` = Yes |

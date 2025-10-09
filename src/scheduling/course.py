@@ -4,7 +4,8 @@ from config.settings import (
     COST_PER_CH_GRAD,
     COST_PER_CH_UNDERGRAD,
     COST_PER_COURSE,
-    ALUMNI_SAVINGS_PERCENT
+    ALUMNI_SAVINGS_PERCENT,
+    APPLY_ALUMNI_SAVINGS
 )
 from config.course_enums import LevelENUM
 from functools import total_ordering
@@ -41,12 +42,13 @@ class Course:
     cost: float = field(init=False)
 
     def __post_init__(self):
+        p = 1
         if self.level == LevelENUM.GRADUATE:
             m = COST_PER_CH_GRAD
-            p = (100-ALUMNI_SAVINGS_PERCENT)/100
+            if APPLY_ALUMNI_SAVINGS:
+                p = (100-ALUMNI_SAVINGS_PERCENT)/100
         elif self.level ==LevelENUM.UNDERGRAD:
             m = COST_PER_CH_UNDERGRAD
-            p = 1
         else:
             raise ValueError(f"{self.course_id=}||Improper {self.level=}")
         

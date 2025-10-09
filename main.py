@@ -11,7 +11,7 @@ If modifying for DB usage, match naming conventions here.
 USER_ID = "User1"
 
 # Dollar amount of grants per session (float)
-TOTAL_GRANT_AMOUNT_PER_SESSION = 2099.0
+TOTAL_GRANT_AMOUNT_PER_SESSION = 2015.0
 
 # Start Date of first session (dt.date)
 # Year and month and day should be TARGET start. 

@@ -88,7 +88,18 @@ def export_schedule(
 
     with open(output_path, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
-        writer.writerow(["Session", "Start Date", "Courses", "Intent Courses", "Total CH", "Total Cost", "User Cost"])
+        writer.writerow([
+            "Session", 
+            "Start Date", 
+            "Courses", 
+            "Intent Courses", 
+            "Total CH", 
+            "Total Cost", 
+            "User Cost",
+            "Grants Applied",
+            "GIB Benefits Applied",
+            "GI Bill Benefits Remaining"
+        ])
 
         for session in user.schedule:
             session_num = session.num
@@ -98,5 +109,19 @@ def export_schedule(
             total_ch = session.tot_ch
             total_cost = round(session.tot_cost)
             user_cost = round(session.adj_cost)
+            grants_applied = round(session.grants_applied)
+            gib_applied = round(session.gib_applied)
+            gib_remaining = round(session.gib_remaining)
 
-            writer.writerow([session_num, start_date, course_ids, intent_ids, total_ch, total_cost, user_cost])
+            writer.writerow([
+                session_num,
+                start_date,
+                course_ids,
+                intent_ids,
+                total_ch,
+                total_cost,
+                user_cost,
+                grants_applied,
+                gib_applied,
+                gib_remaining
+            ])

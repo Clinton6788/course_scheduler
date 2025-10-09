@@ -74,10 +74,15 @@ class GIB:
         
         # Must charge days first to ensure cost is charged fully if no benefits
         ses_covered = self._charge_days(sess, final)
-        charge_amount = self._charge_cost(sess, ses_covered, final)
+        charge_amount, coverage = self._charge_cost(sess, ses_covered, final)
 
         if final:
             self.charged_sessions.append(sess.num)
+            # Add total amount of coverage to session
+            sess.add_gib(coverage)
+            # Add current remaining Benefits
+            sess.gib_remaining = self.active_benefit_year.amount
+
 
         return ses_covered, charge_amount
 
@@ -108,7 +113,7 @@ class GIB:
 
         return True
     
-    def _charge_cost(self, session: Session, was_covered: bool, final: bool) -> float:
+    def _charge_cost(self, session: Session, was_covered: bool, final: bool) -> tuple:
         """
         Deducts the session cost from the appropriate benefit year.
 
@@ -153,7 +158,7 @@ class GIB:
             return user_owes
         else:
             self.benefit_years = target_years
-            return user_owes
+            return user_owes, coverage
 
 
 
