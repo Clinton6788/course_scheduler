@@ -2,6 +2,7 @@
 """------------Sorting-----------"""
 IN_PERSON_PRIORITY = 5          # Base amount to raise priority of in person classes
 CAPSTONE_PRIORITY = 5           # Base amount to LOWER priority of capstone class
+MAX_RECURSION = 200            # Max recursion depth. Recommended: 20 < MAX < 200
 
 """---------Current Course/Session Costs----------"""
 COST_PER_SESSION = 40

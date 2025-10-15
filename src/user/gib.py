@@ -158,6 +158,7 @@ class GIB:
             return user_owes
         else:
             self.benefit_years = target_years
+            self.active_benefit_year = year
             return user_owes, coverage
 
 

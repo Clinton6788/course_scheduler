@@ -209,10 +209,10 @@ class Scheduler:
 
         under_ses = [s for s in user.free_sessions if s.level == LevelENUM.UNDERGRAD]
         grad_ses = [s for s in user.free_sessions if s.level == LevelENUM.GRADUATE]
-        print(f"________GRADSES:________{grad_ses}")
+        print(f"________GRADSES:________\n{grad_ses}")
         print(f"_____________FREE SES__________")
         for s in user.free_sessions:
-            print(f"\n{s.num}: {s.level}") # ----------------------------------- All levels at 0 here
+            print(f"\n{s.num}: {s.level}") 
 
         # Schedule undergrad first if avail:
         if under_courses or under_ses:
@@ -281,6 +281,8 @@ class Scheduler:
         courses: list[Course], 
         sessions: list[Session],
         r: Restraints,
+        tgt_list: list = None,
+        recur = 0,
         ) -> None:
         """Internal method to handle individual scheduling. Must be called from schedule_free.
         Niave, assumes all validation has been passed.
@@ -294,12 +296,13 @@ class Scheduler:
                 i += 1
 
         # Get targets
-        tgt_list = cls._get_course_targets(
-                            len(courses),
-                            len(sessions),
-                            r.ses_min_class,
-                            r.ses_max_class
-                        )
+        if tgt_list is None:
+            tgt_list = cls._get_course_targets(
+                                len(courses),
+                                len(sessions),
+                                r.ses_min_class,
+                                r.ses_max_class
+                            )
         
         # Filter sessions to match tgt_list length
         sessions = sessions[:len(tgt_list)]

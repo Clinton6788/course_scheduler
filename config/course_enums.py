@@ -20,3 +20,9 @@ class SessErrENUM(IntEnum):
     OVER_MAX_COST = 1
     OUT_OF_BENEFITS = 3
     PREREQ_NOT_MET = 4
+
+class CourseLoadENUM(IntEnum):
+    FRONT_HEAVY = 0
+    REAR_HEAVY = 1
+    PYRAMID = 2
+    BALANCED = 3
