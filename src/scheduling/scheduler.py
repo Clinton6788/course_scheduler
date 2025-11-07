@@ -2,7 +2,7 @@ from __future__ import annotations
 from .course import Course
 from .sessions import Session
 from .restraints import Restraints
-from config.course_enums import LevelENUM, StatusENUM
+from config.course_enums import LevelENUM, StatusENUM, CourseLoadENUM
 from config.settings import SESSION_MONTHS, SESSION_WEEKS
 import datetime as dt
 from typing import Optional
@@ -281,8 +281,17 @@ class Scheduler:
         courses: list[Course], 
         sessions: list[Session],
         r: Restraints,
+        ) -> User:
+
+
+    @classmethod
+    def _schedule_level(
+        cls,
+        user: User,
+        courses: list[Course], 
+        sessions: list[Session],
+        r: Restraints,
         tgt_list: list = None,
-        recur = 0,
         ) -> None:
         """Internal method to handle individual scheduling. Must be called from schedule_free.
         Niave, assumes all validation has been passed.
@@ -297,7 +306,7 @@ class Scheduler:
 
         # Get targets
         if tgt_list is None:
-            tgt_list = cls._get_course_targets(
+            tgt_list = cls.get_course_tgts(
                                 len(courses),
                                 len(sessions),
                                 r.ses_min_class,
@@ -412,54 +421,79 @@ class Scheduler:
         return satisfied
 
     @classmethod
-    def _get_course_targets(
+    def get_course_tgts(
         cls,
         n_courses: int,
         n_sessions: int,
         min_per_ses: int,
-        max_per_ses: int
+        max_per_ses: int,
+        load_distribution: int,
     ) -> list[int]:
         """
-        Distribute n_courses across n_sessions as evenly as possible,
+        Distribute n_courses across n_sessions according to load_distribution,
         while respecting min_per_ses and max_per_ses.
 
         Returns a list of course counts per session.
         """
-
         if n_courses < n_sessions * min_per_ses:
             raise ValueError("Too few courses to meet minimum per session.")
         if n_courses > n_sessions * max_per_ses:
             raise ValueError("Too many courses to stay under maximum per session.")
 
-        # Start with the floor division
+        # Start with even distribution
         base = n_courses // n_sessions
         remainder = n_courses % n_sessions
-
-        # Ensure base is within min/max bounds
-        if base < min_per_ses:
-            base = min_per_ses
-            remainder = n_courses - base * n_sessions
-        elif base > max_per_ses:
-            base = max_per_ses
-            remainder = n_courses - base * n_sessions
-
         targets = [base] * n_sessions
 
-        # Distribute remainder one by one to first sessions that won't exceed max_per_ses
+        # Apply min/max constraints
+        for i in range(n_sessions):
+            if targets[i] < min_per_ses:
+                targets[i] = min_per_ses
+            elif targets[i] > max_per_ses:
+                targets[i] = max_per_ses
+
+        # Distribute remainder according to load pattern
+        indices = list(range(n_sessions))
+
+        if load_distribution == CourseLoadENUM.FRONT_HEAVY:
+            # give extra courses to earlier sessions first
+            indices = list(range(n_sessions))
+        elif load_distribution == CourseLoadENUM.REAR_HEAVY:
+            # give extra courses to later sessions first
+            indices = list(reversed(range(n_sessions)))
+        elif load_distribution == CourseLoadENUM.PYRAMID:
+            # extra courses distributed towards middle sessions
+            mid = n_sessions // 2
+            # generate index order: mid, mid-1, mid+1, mid-2, mid+2, ...
+            indices = [mid]
+            offset = 1
+            while len(indices) < n_sessions:
+                if mid - offset >= 0:
+                    indices.append(mid - offset)
+                if mid + offset < n_sessions:
+                    indices.append(mid + offset)
+                offset += 1
+        elif load_distribution == CourseLoadENUM.BALANCED:
+            # round-robin distribution
+            indices = list(range(n_sessions))
+        else:
+            raise ValueError(f"Unknown load distribution: {load_distribution}")
+
+        # Assign remaining courses according to chosen order
         i = 0
         while remainder > 0:
-            if targets[i] < max_per_ses:
-                targets[i] += 1
+            idx = indices[i % n_sessions]
+            if targets[idx] < max_per_ses:
+                targets[idx] += 1
                 remainder -= 1
-            i = (i + 1) % n_sessions  # wrap around if needed
+            i += 1
 
         # Final sanity check
         for t in targets:
             if not (min_per_ses <= t <= max_per_ses):
                 raise ValueError("Cannot distribute courses within min/max bounds.")
 
-        return targets
-        
+        return targets        
 
     @classmethod
     def _extract_matching_prereqs(cls, prereqs: list, intent_ids):

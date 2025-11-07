@@ -44,7 +44,8 @@ def _adj_tgts(
         index_high: int = None,
     ) -> tuple[bool,list]:
     """Readjusts target list, moving counts from inside 
-    (index_low to index_high) to outside where possible.
+    (index_low to index_high) to outside where possible. Defaults to moving to
+    high side if all equal.
 
     Args:
         tgt_list (list): Full target list obtained from 
@@ -136,11 +137,13 @@ def _adj_tgts(
     v -= 1
     target.append(v)
 
-    # Figure out which list is being added to
-    if low_add > high_add:
+    # Figure out which list is being added to; prioritize high slightly
+    if low_add > high_add and low_add > 0:
         tgt = low
-    else:
+    elif high_add > 0:
         tgt = high
+    else:
+        raise ValueError(f"Cannot add to either\n{low_add=}||{high_add=}")
 
     # Get min index
     t = min(tgt)
