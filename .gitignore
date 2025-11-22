@@ -10,3 +10,5 @@ venv/
 
 # Output csv
 course_schedule.csv
+
+.vscode
