@@ -88,7 +88,7 @@ MAX_INPERSON = 1
 SES_MAX_COST = None
 
 # Minimum courses per session for scheduling. Treated as HARD limit (int)
-SES_MIN_COURSE = 1
+SES_MIN_COURSE = 2
 
 # Maximum courses per session for scheduling. Treated as HARD limit (int)
 SES_MAX_COURSE = 4
