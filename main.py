@@ -42,7 +42,7 @@ BENEFITS_ASOF = dt.date(2025, 8, 27)
 # To see column values/names, see README.
 
 # Path to csv (Use `course_input` for undergrad, `course_input_masters` for graduate)
-INPUT_PATH = "course_input_masters.csv"
+INPUT_PATH = "course_input.csv"
 
 # Absoloute or relative path
 ABSOLOUTE_PATH = False
