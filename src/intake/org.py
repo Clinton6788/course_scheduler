@@ -134,6 +134,7 @@ def topo_sort_with_priority(courses: dict) -> list:
     Topologically sort courses based on prereqs.
     Assign priority = depth. Ensures all prereqs appear before dependents.
     """
+    import warnings
     from collections import defaultdict
 
     graph = defaultdict(list)
@@ -141,10 +142,20 @@ def topo_sort_with_priority(courses: dict) -> list:
     sorted_courses = []
 
     # Build graph: prereq -> dependent
+    all_prereq_ids = set()
     for cid, course in courses.items():
         flat_reqs = extract_flat_prereqs(course.pre_reqs)
         for pre in flat_reqs:
             graph[pre].append(cid)
+            all_prereq_ids.add(pre)
+
+    missing = all_prereq_ids - set(courses.keys())
+    if missing:
+        warnings.warn(
+            f"Prerequisite course IDs not found in catalog: {missing}. "
+            f"These will be treated as already completed (external courses).",
+            UserWarning,
+        )
 
     def dfs(course_id, depth=0):
         if course_id not in courses:

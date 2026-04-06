@@ -124,9 +124,6 @@ def validate_df(df: pd.DataFrame) -> bool:
     if not df["session"].dropna().apply(lambda x: isinstance(x, (int, float))).all():
         raise TypeError("'session' must be None or a number")
 
-    df = normalize_prereqs(df)
-
-
     print("DataFrame validation passed.")
     return True
 

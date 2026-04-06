@@ -37,9 +37,12 @@ def generate_schedule(
     # Schedule Session Levels
     # Sch._plan_session_levels(user, restraints, spread_between)
 
-    # Update GI Bill before generating sessions
+    # Apply grants to historical sessions, then charge GI Bill
     if hasattr(user, "gib") and user.gib:
         completed = [s for s in user.schedule if s.start_date <= dt.date.today()]
+        for s in completed:
+            if s.grants_applied == 0 and s.courses:
+                s.add_grants(user.grants.get(s.level, 0))
         user.gib.charge_historical(completed)
 
     # Schedule Free courses or Raise (inside scheduler)

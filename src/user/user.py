@@ -11,7 +11,7 @@ class User:
         first_ses_dt: Optional[dt.date] = None,
         all_courses: Optional[list[sch.Course]] = None,
         course_schedule: Optional[list[sch.Session]] = None,
-        grants_per_ses: int | float = 0,
+        grants_per_level: Optional[dict[int, float]] = None,
         gib: Optional[GIB] = None,
     ):
         """
@@ -22,7 +22,7 @@ class User:
         self.first_ses_dt = first_ses_dt
         self.courses = all_courses or []
         self.schedule = course_schedule or []
-        self.grants = grants_per_ses
+        self.grants = grants_per_level or {0: 0.0, 1: 0.0}
         self.gib = gib
 
         self.is_scheduled = False

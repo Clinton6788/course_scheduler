@@ -10,8 +10,9 @@ If modifying for DB usage, match naming conventions here.
 # User ID (Any | None). Pass `None` for generated shortuuid
 USER_ID = "User1"
 
-# Dollar amount of grants per session (float)
-TOTAL_GRANT_AMOUNT_PER_SESSION = 2015.0
+# Dollar amount of grants per session, by level (float)
+UNDERGRAD_GRANT_PER_SESSION = 2015.0
+GRADUATE_GRANT_PER_SESSION = 0.0
 
 # Start Date of first session (dt.date)
 # Year and month and day should be TARGET start. 
@@ -127,7 +128,7 @@ user = ser.create_new_user(
     first_ses_dt=FIRST_SESSION_DATE,
     user_id= USER_ID,
     courses=courses,
-    grant_amnt_per_ses= TOTAL_GRANT_AMOUNT_PER_SESSION,
+    grants_per_level={0: UNDERGRAD_GRANT_PER_SESSION, 1: GRADUATE_GRANT_PER_SESSION},
     gib=gib
 )
 
@@ -135,12 +136,12 @@ user = ser.create_new_user(
 restraints = ser.generate_restraints(
     inperson_courses=INPERSON_COURSES,
     in_person_end_dt=INPERSON_END_DT,
-    min_inperson=1,
-    max_inperson=1,
-    ses_max_cost=0.0,
-    ses_min_class=2,
-    ses_max_class=4,
-    exceed_benefits=True
+    min_inperson=MIN_INPERSON,
+    max_inperson=MAX_INPERSON,
+    ses_max_cost=SES_MAX_COST,
+    ses_min_class=SES_MIN_COURSE,
+    ses_max_class=SES_MAX_COURSE,
+    exceed_benefits=EXCEED_BENEFITS
 )
 
 # Schedule User's Courses (Operates on User In-Place)

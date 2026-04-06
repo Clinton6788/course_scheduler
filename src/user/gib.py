@@ -3,8 +3,7 @@ from dataclasses import dataclass
 from dateutil.relativedelta import relativedelta
 from typing import Optional
 
-from src.scheduling import Session  # Assumed import paths
-# from src.user import User  # You can add later if needed for user-level association
+from src.scheduling import Session
 
 
 @dataclass
@@ -22,13 +21,6 @@ class GIB:
         remaining_time: tuple[int, int],
         days_as_of: dt.date,
     ):
-        """
-        Args:
-            yearly_amount (int | float): Yearly amount of financial coverage.
-            start_dt (tuple): (month, day) of the benefit cycle start.
-            remaining_time (tuple): (months, days) of benefit time remaining.
-            days_as_of (dt.date): Date the remaining time was calculated from.
-        """
         start_date = dt.date(dt.date.today().year, *start_dt)
         end_date = start_date + relativedelta(years=1) - dt.timedelta(days=1)
 
@@ -41,131 +33,150 @@ class GIB:
         }
 
         m, d = remaining_time
-        self.remaining_days = m * 30 + d
+        self.remaining_days = m * 30 + d  # still approximate by design
         self.asof = days_as_of
 
-        # Track charged Sessions
-        self.charged_sessions = []
+        # Track charged session IDs
+        self.charged_sessions: list[int] = []
 
-    # Must be called upon INIT and changes
+    # =====================
+    # Historical charging
+    # =====================
     def charge_historical(self, sessions: list[Session]) -> None:
-        """
-        Applies completed or in-progress sessions to update initial GI Bill usage.
-        Should be run once per user when loading from saved data or course changes.
-        """
-        for s in sessions:
-            if s in self.charged_sessions:
+        for s in sorted(sessions, key=lambda x: x.start_date):
+            if s.num in self.charged_sessions:
                 continue
-            was_covered = self._charge_days(s, final=True)
-            self._charge_cost(s, was_covered, final=True)
 
+            # Sessions before asof are already accounted for in remaining_days.
+            # They still get dollar coverage but should NOT deduct days.
+            if s.start_date < self.asof:
+                was_covered = True if self.remaining_days > 0 else False
+            else:
+                was_covered = self._charge_days(s, final=True)
+            user_owes, coverage = self._charge_cost(s, was_covered, final=True)
+
+            self.charged_sessions.append(s.num)
+            s.add_gib(coverage)
+            s.gib_remaining = self.active_benefit_year.amount
+
+        # Ensure active year is the present one
+        self._get_or_create_benefit_year(dt.date.today())
+
+    # =====================
+    # Live / simulated charge
+    # =====================
     def charge_session(self, sess: Session, final: bool = False) -> tuple[bool, float]:
-        """
-        Charge a single session to GI Bill benefits or simulate the impact.
-
-        Returns:
-            (ses covered, total charge to user)
-        """
         assert isinstance(sess, Session), f"Invalid session: {type(sess)}"
 
         if sess.num in self.charged_sessions:
             print(f"Already charged session {sess.num}")
-            return
-        
-        # Must charge days first to ensure cost is charged fully if no benefits
+            return False, 0.0
+
         ses_covered = self._charge_days(sess, final)
         charge_amount, coverage = self._charge_cost(sess, ses_covered, final)
 
         if final:
             self.charged_sessions.append(sess.num)
-            # Add total amount of coverage to session
             sess.add_gib(coverage)
-            # Add current remaining Benefits
             sess.gib_remaining = self.active_benefit_year.amount
-
 
         return ses_covered, charge_amount
 
-    def _charge_days(self, session: Session, final: bool) -> bool:
+    # =====================
+    # Internal helpers
+    # =====================
+    def _charge_days(
+        self,
+        session: Session,
+        final: bool,
+        ignore_asof: bool = False,
+    ) -> bool:
         """
-        Determines if GI Bill can cover the given session and optionally charges for it.
-
-        A session is fully covered if the user has at least one day of benefits remaining 
-        on the session's start date.
-
-        Args:
-            session (Session): The session to charge.
-            final (bool): If True, apply the deduction permanently.
-
-        Returns:
-            bool: True if the session is covered by GI Bill benefits, False otherwise.
+        Determines if GI Bill can cover the given session.
         """
-        # If no benefit days left on the session's start date, not covered
-        if self.remaining_days <= 0 or session.start_date < self.asof:
+        if self.remaining_days <= 0:
             return False
 
-        # If at least one day left on session start, full session is covered
-        session_duration = (session.end_date - session.start_date).days
+        if not ignore_asof and session.start_date < self.asof:
+            return False
+
+        # inclusive session length
+        session_duration = (session.end_date - session.start_date).days + 1
         updated_remaining = self.remaining_days - session_duration
 
         if final:
-            self.remaining_days = updated_remaining
+            self.remaining_days = max(0, updated_remaining)
 
         return True
-    
-    def _charge_cost(self, session: Session, was_covered: bool, final: bool) -> tuple:
+
+    def _charge_cost(
+        self,
+        session: Session,
+        was_covered: bool,
+        final: bool,
+    ) -> tuple[float, float]:
         """
         Deducts the session cost from the appropriate benefit year.
 
-        Args:
-            session (Session): The session to charge.
-            was_covered (bool): If True, attempt to cover with GI Bill.
-            final (bool): If True, apply the deduction permanently.
-
-        Returns:
-            float: Amount the user must pay (0 if fully covered).
+        Always returns:
+            (user_owes, coverage)
         """
-        ses_date = session.start_date
         ses_cost = session.adj_cost
 
+        # If not covered by GI Bill at all
         if not was_covered:
-            return ses_cost
+            return ses_cost, 0.0
 
-        # Determine the benefit year for this session
-        year_start = dt.date(ses_date.year, self.benefit_start.month, self.benefit_start.day)
-        if ses_date < year_start:
-            year_start = year_start.replace(year=year_start.year - 1)
+        # -------------------------
+        # Resolve benefit year
+        # -------------------------
+        if final:
+            year = self._get_or_create_benefit_year(session.start_date)
+        else:
+            # Work on a copy for simulation
+            real_year = self._get_or_create_benefit_year(session.start_date)
+            year = BenefitYear(real_year.st, real_year.end, real_year.amount)
 
-        year_end = year_start + relativedelta(years=1) - dt.timedelta(days=1)
-
-        # Use working copy if not final
-        target_years = self.benefit_years if final else {
-            k: BenefitYear(v.st, v.end, v.amount) for k, v in self.benefit_years.items()
-        }
-
-        # Initialize year if missing
-        if year_start not in target_years:
-            target_years[year_start] = BenefitYear(year_start, year_end, self.yearly_amount)
-
+        # -------------------------
         # Apply coverage
-        year = target_years[year_start]
+        # -------------------------
         coverage = min(ses_cost, year.amount)
-        year.amount -= coverage
         user_owes = ses_cost - coverage
 
-        # Apply updated copy if final
-        if final is False:
-            return user_owes
-        else:
-            self.benefit_years = target_years
-            return user_owes, coverage
+        if final:
+            year.amount -= coverage
+        # else: simulated copy, discard changes
 
+        return user_owes, coverage
 
-
-    def get_total_remaining(self, year) -> float:
-        by = self.benefit_years.get(year, None)
-        return by.amount if by else by
+    # =====================
+    # Introspection helpers
+    # =====================
+    def get_total_remaining(self, year: dt.date) -> float:
+        by = self.benefit_years.get(year)
+        return by.amount if by else 0.0
 
     def get_remaining_days(self) -> int:
         return self.remaining_days
 
+    def _get_or_create_benefit_year(self, ref_date: dt.date) -> BenefitYear:
+        """
+        Returns the benefit year covering ref_date.
+        Creates missing years and updates active_benefit_year.
+        """
+        year_start = dt.date(
+            ref_date.year,
+            self.benefit_start.month,
+            self.benefit_start.day,
+        )
+        if ref_date < year_start:
+            year_start = year_start.replace(year=year_start.year - 1)
+
+        if year_start not in self.benefit_years:
+            year_end = year_start + relativedelta(years=1) - dt.timedelta(days=1)
+            self.benefit_years[year_start] = BenefitYear(
+                year_start, year_end, self.yearly_amount
+            )
+
+        self.active_benefit_year = self.benefit_years[year_start]
+        return self.active_benefit_year

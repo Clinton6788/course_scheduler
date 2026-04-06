@@ -11,18 +11,18 @@ def create_new_user(
     first_ses_dt: Optional[dt.date] = None,
     user_id: Optional[Any] = None,
     courses: Optional[list[Course]] = None,
-    grant_amnt_per_ses: Optional[int | float] = 0,
+    grants_per_level: Optional[dict[int, float]] = None,
     gib: Optional[GIB] = None
 ) -> User:
     """
     Creates and returns a fully initialized User instance with optional courses, grants, and GI Bill benefits.
-    All validation is handled here before constructing the User object.
 
     Args:
         first_ses_dt (datetime.date, optional): Start date of the user's first session.
         user_id (Any, optional): Unique identifier for the user.
         courses (list[Course], optional): All Course objects available to the user.
-        grant_amnt_per_ses (int | float, optional): Dollar amount of grant funding per session.
+        grants_per_level (dict[int, float], optional): Grant amount per session keyed by
+            LevelENUM value. E.g. {0: 2015.0, 1: 0.0}.
         gib (GIB, optional): GI Bill tracking object.
 
     Returns:
@@ -41,10 +41,12 @@ def create_new_user(
     if courses and not all(isinstance(c, Course) for c in courses):
         raise TypeError("All items in courses must be instances of Course.")
 
-    if grant_amnt_per_ses is not None and not isinstance(grant_amnt_per_ses, (int, float)):
-        raise TypeError("grant_amnt_per_ses must be an int or float.")
-    if grant_amnt_per_ses and grant_amnt_per_ses < 0:
-        raise ValueError("grant_amnt_per_ses cannot be negative.")
+    if grants_per_level is not None:
+        if not isinstance(grants_per_level, dict):
+            raise TypeError("grants_per_level must be a dict mapping level to amount.")
+        for lvl, amt in grants_per_level.items():
+            if not isinstance(amt, (int, float)) or amt < 0:
+                raise ValueError(f"Grant amount for level {lvl} must be a non-negative number.")
 
     update_gib = False
     if gib is not None:
@@ -65,7 +67,7 @@ def create_new_user(
         first_ses_dt=first_ses_dt,
         all_courses=courses,
         course_schedule=[],
-        grants_per_ses=grant_amnt_per_ses,
+        grants_per_level=grants_per_level,
         gib=gib
     )
 
@@ -74,7 +76,7 @@ def modify_user(
     first_ses_dt: Optional[dt.date] = None,
     courses: Optional[list[Course]] = None,
     course_schedule: Optional[list[Session]] = None,
-    grant_amnt_per_ses: Optional[int | float] = None,
+    grants_per_level: Optional[dict[int, float]] = None,
     gib: Optional[GIB] = None
 ) -> None:
     """
@@ -86,7 +88,7 @@ def modify_user(
         first_ses_dt (datetime.date, optional): New first session date.
         courses (list[Course], optional): New list of Course instances.
         course_schedule (list[Session], optional): New list of Session instances.
-        grant_amnt_per_ses (int | float, optional): Updated grant amount per session.
+        grants_per_level (dict[int, float], optional): Grant amount per session keyed by level.
         gib (GIB, optional): New GI Bill benefit tracking instance.
 
     Raises:
@@ -119,12 +121,13 @@ def modify_user(
         user.schedule = course_schedule
         update_courses = True
 
-    if grant_amnt_per_ses is not None:
-        if not isinstance(grant_amnt_per_ses, (int, float)):
-            raise TypeError("grant_amnt_per_ses must be an int or float.")
-        if grant_amnt_per_ses < 0:
-            raise ValueError("grant_amnt_per_ses cannot be negative.")
-        user.grants = grant_amnt_per_ses
+    if grants_per_level is not None:
+        if not isinstance(grants_per_level, dict):
+            raise TypeError("grants_per_level must be a dict mapping level to amount.")
+        for lvl, amt in grants_per_level.items():
+            if not isinstance(amt, (int, float)) or amt < 0:
+                raise ValueError(f"Grant amount for level {lvl} must be a non-negative number.")
+        user.grants = grants_per_level
 
     if gib is not None:
         if not isinstance(gib, GIB):

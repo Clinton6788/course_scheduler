@@ -69,10 +69,10 @@ class Session:
     # endregion
 
     def add_grants(self, total_amount:float | int):
-        """Add a grant amount to be subtracted from total value
+        """Set the grant amount to be subtracted from total value.
         """
         assert isinstance(total_amount, (int, float)), f"Grant wrong type: {type(total_amount)}"
-        self._grants_applied += total_amount
+        self._grants_applied = total_amount
         self._calc_courses()
 
     def add_gib(self, total_amount: float | int):
@@ -86,13 +86,15 @@ class Session:
     def _calc_courses(self):
         self._tot_cost = COST_PER_SESSION
         self._tot_ch = 0
-        self._tot_cost = 0
         self._tot_courses = 0
         self._pre_reqs = []
         
         for c in self._courses:
             # Validate level
-            assert self.level == c.level, f"Session||Level Difference||{self.level=}||{c.level=}"
+            if self.level != c.level:
+                raise ValueError(
+                    f"Cannot add {c.course_id} (level={c.level}) to session {self._num} (level={self.level})"
+                )
             self._tot_courses += 1
             self._tot_ch += c.credit_hours
             self._pre_reqs.append(c.pre_reqs)
