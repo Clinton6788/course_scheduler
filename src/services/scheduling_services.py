@@ -89,6 +89,11 @@ def export_schedule(
 
     user.schedule.sort()
 
+    # Renumber sessions sequentially (gaps can appear when optimizer
+    # uses fewer sessions than were originally created)
+    for i, session in enumerate(user.schedule, start=1):
+        session._num = i
+
     with open(output_path, mode='w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([

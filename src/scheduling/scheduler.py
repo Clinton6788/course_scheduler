@@ -3,7 +3,7 @@ from .course import Course
 from .sessions import Session
 from .restraints import Restraints
 from config.course_enums import LevelENUM, StatusENUM
-from config.settings import SESSION_MONTHS, SESSION_WEEKS
+from config.settings import SESSION_MONTHS, SESSION_WEEKS, COST_PER_SESSION
 import datetime as dt
 from typing import Optional
 import itertools
@@ -231,15 +231,30 @@ class Scheduler:
 
         # Schedule undergrad first if avail:
         if under_courses or under_ses:
-            if not (under_ses and under_courses):
-                raise SchedulingError("Undergrad courses vs session discrepancy.")
+            if not under_ses:
+                raise SchedulingError(
+                    f"Undergrad: {len(under_courses)} courses to schedule but 0 future sessions available. "
+                    f"Check SPREAD_BETWEEN or session dates."
+                )
+            if not under_courses:
+                raise SchedulingError(
+                    f"Undergrad: {len(under_ses)} sessions allocated but 0 courses to schedule. "
+                    f"All undergrad courses may already be assigned."
+                )
             cls._schedule_level(user, under_courses, under_ses, restraints)
 
         # Schedule graduate if available
         if grad_courses or grad_ses:
-            if not (grad_courses and grad_ses):
-                print(f"Grad Courses: {grad_courses}\n Grad Ses: {grad_ses}")
-                raise SchedulingError("Graduate courses vs session discrepancy.")
+            if not grad_ses:
+                raise SchedulingError(
+                    f"Graduate: {len(grad_courses)} courses to schedule but 0 future sessions available. "
+                    f"Check SPREAD_BETWEEN or session dates."
+                )
+            if not grad_courses:
+                raise SchedulingError(
+                    f"Graduate: {len(grad_ses)} sessions allocated but 0 courses to schedule. "
+                    f"All graduate courses may already be assigned."
+                )
             cls._schedule_level(user, grad_courses, grad_ses, restraints)
 
         # --- Put Intent in correct Session ---
@@ -304,8 +319,6 @@ class Scheduler:
         Tries multiple session counts (from minimum needed up to all available)
         and picks the schedule with the lowest estimated user cost.
         """
-        from config.settings import COST_PER_SESSION
-
         # Strip challenge/transfer intent courses (treated as already complete)
         i = 0
         while i < len(courses):
@@ -323,47 +336,78 @@ class Scheduler:
         n_courses = len(courses)
 
         # Determine range of session counts to try
-        min_sessions = max(1, (n_courses + r.ses_max_class - 1) // r.ses_max_class)
+        # Account for courses already placed in sessions (from schedule_set)
+        pre_placed = sum(len(s.courses) for s in sessions)
+        total_to_hold = n_courses + pre_placed
+        min_sessions = max(1, (total_to_hold + r.ses_max_class - 1) // r.ses_max_class)
         max_sessions = len(sessions)
         grant_amount = user.grants.get(sessions[0].level, 0)
 
         # Try each possible session count, collect valid results
         candidates = []
+        level_name = "Undergrad" if sessions[0].level == LevelENUM.UNDERGRAD else "Graduate"
+        rejection_reasons = []
+
         for n_ses in range(min_sessions, max_sessions + 1):
-            tgt_list = cls._get_course_targets(
-                n_courses, n_ses, r.ses_min_class, r.ses_max_class
-            )
-            if tgt_list is None:
-                continue
-
             trial_sessions = sessions[:n_ses]
-            result = cls._backtrack_schedule(
-                courses=list(courses),
-                sessions=trial_sessions,
-                tgt_list=tgt_list,
-                r=r,
-                has_gib=has_gib,
-                user=user,
-                session_idx=0,
-                assigned=list(user.assigned_courses),
+            pre_placed_in_trial = sum(len(s.courses) for s in trial_sessions)
+            total_in_trial = n_courses + pre_placed_in_trial
+
+            base_tgt_list = cls._get_course_targets(
+                total_in_trial, n_ses, r.ses_min_class, r.ses_max_class
             )
-            if result is None:
+            if base_tgt_list is None:
+                rejection_reasons.append(
+                    f"{n_ses} sessions: can't distribute {total_in_trial} courses "
+                    f"({n_courses} free + {pre_placed_in_trial} pre-placed) "
+                    f"within {r.ses_min_class}-{r.ses_max_class} per session"
+                )
                 continue
 
-            # Score: estimate total user cost (total cost - grants per session)
-            total_cost = sum(
-                sum(c.cost for c in combo) + COST_PER_SESSION
-                for _, combo in result
-            )
-            total_grants = grant_amount * n_ses
-            estimated_user_cost = total_cost - total_grants
-            candidates.append((estimated_user_cost, result))
+            # Try all unique permutations of the target distribution
+            # e.g. [4,4,4,3] → also try [4,4,3,4], [4,3,4,4], [3,4,4,4]
+            seen_tgts = set()
+            for tgt_list in itertools.permutations(base_tgt_list):
+                tgt_list = list(tgt_list)
+                tgt_key = tuple(tgt_list)
+                if tgt_key in seen_tgts:
+                    continue
+                seen_tgts.add(tgt_key)
 
-            print(f"  [candidate] {n_ses} sessions: est_user_cost={estimated_user_cost:.0f}")
+                result = cls._backtrack_schedule(
+                    courses=list(courses),
+                    sessions=trial_sessions,
+                    tgt_list=tgt_list,
+                    r=r,
+                    has_gib=has_gib,
+                    user=user,
+                    session_idx=0,
+                    assigned=list(user.assigned_courses),
+                )
+                if result is None:
+                    continue
+
+                # Score: simulate GIB day AND dollar consumption
+                estimated_user_cost = cls._estimate_user_cost(
+                    result, grant_amount, user, has_gib
+                )
+                candidates.append((estimated_user_cost, result))
+
+                print(f"  [candidate] {n_ses} sessions {tgt_list}: "
+                      f"est_user_cost={estimated_user_cost:.0f}")
+
+            if not seen_tgts:
+                rejection_reasons.append(
+                    f"{n_ses} sessions: backtracking exhausted for all target permutations"
+                )
 
         if not candidates:
+            reasons = "\n  ".join(rejection_reasons) if rejection_reasons else "No session counts were valid"
             raise SchedulingError(
-                "No valid schedule found: could not satisfy all constraints"
+                f"{level_name}: No valid schedule found for {n_courses} courses "
+                f"across {min_sessions}-{max_sessions} sessions "
+                f"(min={r.ses_min_class}, max={r.ses_max_class}).\n"
+                f"  Rejection details:\n  {reasons}"
             )
 
         # Pick cheapest
@@ -407,7 +451,11 @@ class Scheduler:
         tgt = tgt_list[session_idx]
 
         # Forward check: enough courses remain to fill all future sessions?
-        future_needed = sum(tgt_list[session_idx:])
+        # Subtract courses already placed in sessions (from schedule_set)
+        future_needed = sum(tgt_list[session_idx:]) - sum(
+            len(sessions[i].courses) for i in range(session_idx, len(sessions))
+            if i < len(tgt_list)
+        )
         if len(courses) < future_needed:
             return None
 
@@ -457,6 +505,56 @@ class Scheduler:
                 return [(s, list(combo))] + result
 
         return None  # All combos exhausted — backtrack
+
+    @classmethod
+    def _estimate_user_cost(
+        cls,
+        result: list[tuple[Session, list[Course]]],
+        grant_amount: float,
+        user: User,
+        has_gib: bool,
+    ) -> float:
+        """Estimate total user out-of-pocket cost for a candidate schedule.
+        Simulates GIB day and dollar consumption per benefit year.
+        """
+        from dateutil.relativedelta import relativedelta
+
+        session_duration = SESSION_WEEKS * 7 + 1
+        sim_days = user.gib.remaining_days if has_gib else 0
+
+        # Build simulated benefit year balances (copy, don't mutate)
+        sim_years = {}
+        if has_gib:
+            for ys, by in user.gib.benefit_years.items():
+                sim_years[ys] = by.amount
+            benefit_month = user.gib.benefit_start.month
+            benefit_day = user.gib.benefit_start.day
+
+        estimated_user_cost = 0.0
+        for ses, combo in result:
+            ses_cost = sum(c.cost for c in combo) + COST_PER_SESSION
+            after_grants = max(0, ses_cost - grant_amount)
+
+            if has_gib and sim_days > 0:
+                sim_days = max(0, sim_days - session_duration)
+
+                # Resolve benefit year for this session
+                year_start = ses.start_date.replace(
+                    month=benefit_month, day=benefit_day
+                )
+                if ses.start_date < year_start:
+                    year_start = year_start.replace(year=year_start.year - 1)
+                if year_start not in sim_years:
+                    sim_years[year_start] = user.gib.yearly_amount
+
+                # Apply dollar coverage
+                coverage = min(after_grants, sim_years[year_start])
+                sim_years[year_start] -= coverage
+                estimated_user_cost += after_grants - coverage
+            else:
+                estimated_user_cost += after_grants
+
+        return estimated_user_cost
 
     @classmethod
     def _generate_valid_combinations(
