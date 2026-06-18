@@ -4,18 +4,22 @@ IN_PERSON_PRIORITY = 5          # Base amount to raise priority of in person cla
 CAPSTONE_PRIORITY = 5           # Base amount to LOWER priority of capstone class
 
 """---------Current Course/Session Costs----------"""
-COST_PER_SESSION = 40
-COST_PER_COURSE = 100           # Additional costs only (outside of cost/ch)
-COST_PER_CH_UNDERGRAD = 514
-COST_PER_CH_GRAD = 776
+# Costs are now DATED and live in a CSV (one row per price tier; columns:
+# Begin Date, Cost Per Session, Cost Per Course, Cost Per CH Undergrad,
+# Cost Per CH Grad, Alumni Savings Percent). The tier in effect for a session
+# is the latest row whose Begin Date is on/before that session's start date.
+# To change prices, add a new row -- existing rows keep historical pricing.
+# See src/scheduling/pricing.py.
+PRICING_PATH = "config/pricing.csv"
+PRICING_PATH_ABS = False        # Bool: is PRICING_PATH absolute?
 
-# Whole percentage; Ex: '20' for 20%.... NOT 0.2.... # **ONLY APPLIES TO GRAD LEVEL**
-ALUMNI_SAVINGS_PERCENT = 20     
-APPLY_ALUMNI_SAVINGS = True             # Bool trigger to apply to grad courses
+# Bool trigger to apply alumni savings to grad courses. The savings *percentage*
+# itself is dated in the pricing CSV (per tier); this just switches it on/off.
+APPLY_ALUMNI_SAVINGS = True
 # IF DEV:
-# APPLY belongs in restraints, not settings. 
+# APPLY belongs in restraints, not settings.
 # I'm just too lazy to move it at this point.
-# Only utilized in 'Course' obj's __post_init__
+# Only utilized in 'Course.cost_on()'
 
 
 """----------Sessions ------------"""

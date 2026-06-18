@@ -1,11 +1,11 @@
 from config.settings import (
-    COST_PER_SESSION,
     SESSION_START_DAY,
     SESSION_WEEKS
 )
 import datetime as dt
 from config.course_enums import LevelENUM
 from src.scheduling.course import Course
+from src.scheduling.pricing import get_pricing
 from src.helpers import round_to_nearest_weekday_start
 
 """DOWN AND DIRTY; Don't Perfect!"""
@@ -84,11 +84,13 @@ class Session:
 
 
     def _calc_courses(self):
-        self._tot_cost = COST_PER_SESSION
+        # Costs are dated; resolve the tier in effect on this session's start date.
+        tier = get_pricing(self._start_date)
+        self._tot_cost = tier.cost_per_session
         self._tot_ch = 0
         self._tot_courses = 0
         self._pre_reqs = []
-        
+
         for c in self._courses:
             # Validate level
             if self.level != c.level:
@@ -98,7 +100,7 @@ class Session:
             self._tot_courses += 1
             self._tot_ch += c.credit_hours
             self._pre_reqs.append(c.pre_reqs)
-            self._tot_cost += c.cost
+            self._tot_cost += c.cost_on(self._start_date)
 
         self._adj_cost = self._tot_cost - self._grants_applied - self._gib_applied
 

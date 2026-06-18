@@ -3,7 +3,8 @@ from .course import Course
 from .sessions import Session
 from .restraints import Restraints
 from config.course_enums import LevelENUM, StatusENUM
-from config.settings import SESSION_MONTHS, SESSION_WEEKS, COST_PER_SESSION
+from config.settings import SESSION_MONTHS, SESSION_WEEKS
+from .pricing import get_pricing
 import datetime as dt
 from typing import Optional
 import itertools
@@ -349,57 +350,72 @@ class Scheduler:
         rejection_reasons = []
 
         for n_ses in range(min_sessions, max_sessions + 1):
-            trial_sessions = sessions[:n_ses]
-            pre_placed_in_trial = sum(len(s.courses) for s in trial_sessions)
-            total_in_trial = n_courses + pre_placed_in_trial
+            # Enumerate session subsets: try different combinations of which
+            # sessions to use (not just the first N). This matters when
+            # benefit-year boundaries or GIB day limits interact with session dates.
+            session_subsets = cls._enumerate_session_subsets(sessions, n_ses)
 
-            base_tgt_list = cls._get_course_targets(
-                total_in_trial, n_ses, r.ses_min_class, r.ses_max_class
+            found_zero_cost = False
+            for trial_sessions in session_subsets:
+                pre_placed_in_trial = sum(len(s.courses) for s in trial_sessions)
+                total_in_trial = n_courses + pre_placed_in_trial
+
+                sorted_distributions = cls._enumerate_target_distributions(
+                    total_in_trial, n_ses, r.ses_min_class, r.ses_max_class
+                )
+                if not sorted_distributions:
+                    continue
+
+                seen_tgts = set()
+                for sorted_dist in sorted_distributions:
+                    for tgt_list in itertools.permutations(sorted_dist):
+                        if tgt_list in seen_tgts:
+                            continue
+                        seen_tgts.add(tgt_list)
+                        tgt_list = list(tgt_list)
+
+                        result = cls._backtrack_schedule(
+                            courses=list(courses),
+                            sessions=trial_sessions,
+                            tgt_list=tgt_list,
+                            r=r,
+                            has_gib=has_gib,
+                            user=user,
+                            session_idx=0,
+                            assigned=list(user.assigned_courses),
+                        )
+                        if result is None:
+                            continue
+
+                        estimated_user_cost = cls._estimate_user_cost(
+                            result, grant_amount, user, has_gib
+                        )
+                        candidates.append((estimated_user_cost, result))
+
+                        if estimated_user_cost == 0:
+                            found_zero_cost = True
+                            break
+                    if found_zero_cost:
+                        break
+                if found_zero_cost:
+                    break
+
+            # Report best candidate found for this session count
+            best_for_n = min(
+                (c for c in candidates if len(c[1]) == n_ses),
+                default=None,
+                key=lambda x: x[0],
             )
-            if base_tgt_list is None:
+            if best_for_n is not None:
+                print(f"  [best @ {n_ses} sessions] est_user_cost={best_for_n[0]:.0f}")
+            else:
                 rejection_reasons.append(
-                    f"{n_ses} sessions: can't distribute {total_in_trial} courses "
-                    f"({n_courses} free + {pre_placed_in_trial} pre-placed) "
-                    f"within {r.ses_min_class}-{r.ses_max_class} per session"
+                    f"{n_ses} sessions: no valid schedule found across any subset/distribution"
                 )
-                continue
 
-            # Try all unique permutations of the target distribution
-            # e.g. [4,4,4,3] → also try [4,4,3,4], [4,3,4,4], [3,4,4,4]
-            seen_tgts = set()
-            for tgt_list in itertools.permutations(base_tgt_list):
-                tgt_list = list(tgt_list)
-                tgt_key = tuple(tgt_list)
-                if tgt_key in seen_tgts:
-                    continue
-                seen_tgts.add(tgt_key)
-
-                result = cls._backtrack_schedule(
-                    courses=list(courses),
-                    sessions=trial_sessions,
-                    tgt_list=tgt_list,
-                    r=r,
-                    has_gib=has_gib,
-                    user=user,
-                    session_idx=0,
-                    assigned=list(user.assigned_courses),
-                )
-                if result is None:
-                    continue
-
-                # Score: simulate GIB day AND dollar consumption
-                estimated_user_cost = cls._estimate_user_cost(
-                    result, grant_amount, user, has_gib
-                )
-                candidates.append((estimated_user_cost, result))
-
-                print(f"  [candidate] {n_ses} sessions {tgt_list}: "
-                      f"est_user_cost={estimated_user_cost:.0f}")
-
-            if not seen_tgts:
-                rejection_reasons.append(
-                    f"{n_ses} sessions: backtracking exhausted for all target permutations"
-                )
+            # Early exit the outer loop if we found $0
+            if found_zero_cost:
+                break
 
         if not candidates:
             reasons = "\n  ".join(rejection_reasons) if rejection_reasons else "No session counts were valid"
@@ -532,7 +548,7 @@ class Scheduler:
 
         estimated_user_cost = 0.0
         for ses, combo in result:
-            ses_cost = sum(c.cost for c in combo) + COST_PER_SESSION
+            ses_cost = sum(c.cost_on(ses.start_date) for c in combo) + get_pricing(ses.start_date).cost_per_session
             after_grants = max(0, ses_cost - grant_amount)
 
             if has_gib and sim_days > 0:
@@ -673,6 +689,95 @@ class Scheduler:
                 satisfied.append(c)
 
         return satisfied
+
+    # Cap total session subsets to prevent combinatorial explosion with many
+    # available sessions. When exceeded, we fall back to a sampled set of subsets.
+    MAX_SESSION_SUBSETS = 30
+
+    @classmethod
+    def _enumerate_session_subsets(
+        cls,
+        sessions: list[Session],
+        n_ses: int,
+    ) -> list[list[Session]]:
+        """Enumerate which subsets of `sessions` to consider when using n_ses of them.
+        Different subsets can produce different costs because sessions have fixed
+        dates that interact with GIB benefit year boundaries and day limits.
+
+        When all subsets fit under MAX_SESSION_SUBSETS, returns all of them.
+        Otherwise returns a sampled set that prioritizes prefix, suffix, and
+        single-skip variants (which are the most impactful for benefit-year splits).
+        """
+        if n_ses > len(sessions):
+            return []
+        if n_ses == len(sessions):
+            return [list(sessions)]
+
+        import math
+        total = math.comb(len(sessions), n_ses)
+        if total <= cls.MAX_SESSION_SUBSETS:
+            return [list(combo) for combo in itertools.combinations(sessions, n_ses)]
+
+        # Sampled: prefix, suffix, then each single-skip variant
+        results = []
+        seen = set()
+
+        def add(subset):
+            key = tuple(s.num for s in subset)
+            if key not in seen:
+                seen.add(key)
+                results.append(list(subset))
+
+        # Prefix
+        add(sessions[:n_ses])
+        # Suffix
+        add(sessions[-n_ses:])
+        # Every possible single-session skip (drop one, keep n_ses)
+        for skip_idx in range(len(sessions)):
+            subset = [s for i, s in enumerate(sessions) if i != skip_idx]
+            if len(subset) >= n_ses:
+                add(subset[:n_ses])
+                add(subset[-n_ses:])
+            if len(results) >= cls.MAX_SESSION_SUBSETS:
+                break
+
+        return results
+
+    @classmethod
+    def _enumerate_target_distributions(
+        cls,
+        n_courses: int,
+        n_sessions: int,
+        min_per_ses: int,
+        max_per_ses: int,
+    ) -> list[tuple[int, ...]]:
+        """Enumerate ALL valid sorted (descending) distributions of n_courses
+        across n_sessions where each session has between min_per_ses and
+        max_per_ses courses.
+
+        Returns a list of sorted tuples. Caller should permute each tuple to
+        try different placements.
+        """
+        results = []
+
+        def recurse(remaining_courses: int, remaining_sessions: int,
+                    max_allowed: int, current: list[int]) -> None:
+            if remaining_sessions == 0:
+                if remaining_courses == 0:
+                    results.append(tuple(current))
+                return
+            # Each future session value is bounded by min_per and max_allowed
+            # Lower bound: enough to not leave too many for future sessions
+            min_v = max(min_per_ses, remaining_courses - (remaining_sessions - 1) * max_allowed)
+            # Upper bound: don't use more than allowed, and leave at least min_per for others
+            max_v = min(max_allowed, remaining_courses - (remaining_sessions - 1) * min_per_ses)
+            if min_v > max_v:
+                return
+            for v in range(max_v, min_v - 1, -1):
+                recurse(remaining_courses - v, remaining_sessions - 1, v, current + [v])
+
+        recurse(n_courses, n_sessions, max_per_ses, [])
+        return results
 
     @classmethod
     def _get_course_targets(

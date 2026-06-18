@@ -1,13 +1,9 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
-from config.settings import (
-    COST_PER_CH_GRAD,
-    COST_PER_CH_UNDERGRAD,
-    COST_PER_COURSE,
-    ALUMNI_SAVINGS_PERCENT,
-    APPLY_ALUMNI_SAVINGS
-)
+import datetime as dt
+from config.settings import APPLY_ALUMNI_SAVINGS
 from config.course_enums import LevelENUM
+from src.scheduling.pricing import get_pricing
 from functools import total_ordering
 
 @total_ordering
@@ -39,25 +35,36 @@ class Course:
     transfer_intent: bool = False
     challenge_intent: bool = False
     priority: int = 0
-    cost: float = field(init=False)
 
     def __post_init__(self):
+        # Fail fast on an invalid level (cost is now computed per-date in cost_on()).
+        if self.level not in (LevelENUM.GRADUATE, LevelENUM.UNDERGRAD):
+            raise ValueError(f"{self.course_id=}||Improper {self.level=}")
+
+    def cost_on(self, date: dt.date) -> float:
+        """Cost of this course under the price tier in effect on ``date``.
+
+        ``date`` is the start date of the session the course is being scheduled
+        into, so the same course can cost different amounts in different sessions
+        if a price change falls between them.
+        """
+        tier = get_pricing(date)
         p = 1
         if self.level == LevelENUM.GRADUATE:
-            m = COST_PER_CH_GRAD
+            m = tier.cost_per_ch_grad
             if APPLY_ALUMNI_SAVINGS:
-                p = (100-ALUMNI_SAVINGS_PERCENT)/100
-        elif self.level ==LevelENUM.UNDERGRAD:
-            m = COST_PER_CH_UNDERGRAD
+                p = (100 - tier.alumni_savings_percent) / 100
+        elif self.level == LevelENUM.UNDERGRAD:
+            m = tier.cost_per_ch_undergrad
         else:
             raise ValueError(f"{self.course_id=}||Improper {self.level=}")
-        
-        gross = self.credit_hours * m + COST_PER_COURSE
-        self.cost = round(gross * p, 2)
+
+        gross = self.credit_hours * m + tier.cost_per_course
+        return round(gross * p, 2)
 
     def __repr__(self):
             return (f"Course(course_id='{self.course_id}', level={self.level}, status={self.status}, "
-                    f"session={self.session}, priority={self.priority}, cost={self.cost})")        
+                    f"session={self.session}, priority={self.priority})")
 
 
     def __eq__(self, other):

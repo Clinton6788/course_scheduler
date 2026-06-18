@@ -42,7 +42,7 @@ BENEFITS_ASOF = dt.date(2025, 8, 27)
 # To see all possible column name variations, see intake.py. 
 # To see column values/names, see README.
 
-# Path to csv (Use `course_input` for undergrad, `course_input_masters` for graduate)
+# Path to csv (Use `course_input` for undergrad, `course_input_masters` for graduate examples)
 INPUT_PATH = "course_input_masters.csv"
 
 # Absoloute or relative path
